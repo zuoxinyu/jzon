@@ -321,12 +321,20 @@ func (jz *Jzon) OFilter(predictFunc func(key string, value *Jzon) bool) Jzon {
 	return res
 }
 
-// Map is a flat map which retrieves each children node in a Jzon
+// Map is just flat map which retrieves on each children node in the Jzon
 func (jz *Jzon) Map(mapFunc func(g *Jzon) Any) Any {
 	switch jz.Type {
-	case JzTypeArr: return jz.AMap(func(g *Jzon) (res []Any) { return append(res, mapFunc(g)) })
-	case JzTypeObj: return jz.OMap(func(k string, v *Jzon) Any { return mapFunc(v) })
+	case JzTypeArr:
+		return jz.AMap(func(g *Jzon) (res []Any) {
+			return append(res, mapFunc(g))
+		})
+	case JzTypeObj:
+		return jz.OMap(func(k string, v *Jzon) Any {
+			return mapFunc(v)
+		})
+	default:
+		return mapFunc(jz)
 	}
-
-	return mapFunc(jz)
+	// should never reach
+	return nil
 }

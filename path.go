@@ -8,7 +8,7 @@ func (jz *Jzon) Path(path string) (g *Jzon, err error) {
 }
 
 // SearchPath determines if there exists the node on the given path
-func (jz *Jzon) SearchPath(path string) (exists bool, err error) {
+func (jz *Jzon) SearchPath(path string) (exists bool) {
 	// TODO:
 	return
 }

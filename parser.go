@@ -1,7 +1,6 @@
 package jzon
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"strconv"
@@ -15,20 +14,20 @@ type position struct {
 var pos position
 
 func expect(c uint8, found uint8) error {
-	return errors.New(fmt.Sprintf("expect '%c' but '%c' found at [%d:%d]", c, found, pos.row, pos.col))
+	return fmt.Errorf("expect '%c' but found '%c' at [%d:%d]", c, found, pos.row, pos.col)
 }
 
 func expectTypeOf(ex ValueType, real ValueType) error {
-	return errors.New(fmt.Sprintf("expect node of type %s the real type is %s", typeStrings[ex], typeStrings[real]))
+	return fmt.Errorf("expect node of type %s the real type is %s", typeStrings[ex], typeStrings[real])
 }
 
 func expectOneOf(pattern string, found uint8) error {
 	st := strings.Join(strings.Split(pattern, ""), "|")
-	return errors.New(fmt.Sprintf("expect one of [%s] but '%c' found at [%d:%d]", st, found, pos.row, pos.col))
+	return fmt.Errorf("expect one of [%s] but found '%c' at [%d:%d]", st, found, pos.row, pos.col)
 }
 
 func expectString(pattern string, found string) error {
-	return errors.New(fmt.Sprintf("expect \"%s\" but \"%s\" found at [%d:%d]", pattern, found, pos.row, pos.col))
+	return fmt.Errorf("expect \"%s\" but found \"%s\" at [%d:%d]", pattern, found, pos.row, pos.col)
 }
 
 func skipWhiteSpaces(str string) string {
@@ -80,6 +79,16 @@ func parseObj(json string) (obj Jzon, rem string, err error) {
 	obj.obj = make(map[string]Jzon)
 	var k string
 	var v Jzon
+
+	// return empty object directly
+	oldPos := pos
+	try := skipWhiteSpaces(json[1:])
+	if try[0] == '}' {
+		pos.col++
+		return obj, try[1:], nil
+	}
+	// recover
+	pos = oldPos
 	rem = json
 
 	for {
@@ -112,6 +121,16 @@ func parseObj(json string) (obj Jzon, rem string, err error) {
 func parseArr(json string) (arr Jzon, rem string, err error) {
 	arr.Type = JzTypeArr
 	var v Jzon
+
+	// return empty array directly
+	oldPos := pos
+	try := skipWhiteSpaces(json[1:])
+	if try[0] == ']' {
+		pos.col++
+		return arr, try[1:], nil
+	}
+	// recover
+	pos = oldPos
 	rem = json
 
 	for {
@@ -213,6 +232,12 @@ func parseKey(json string) (k string, rem string, err error) {
 	pos.col++
 	rem = json[1:]
 	x := 0
+
+	// return empty string directly
+	if rem[0] == '"' {
+		pos.col++
+		return "", rem[1:], nil
+	}
 
 	for i, c := range rem {
 		if c == '"' && i != 0 && rem[i-1] != '\\' {

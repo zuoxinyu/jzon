@@ -6,14 +6,14 @@ func Serialize(s Any) Jzon {
 	return Jzon{}
 }
 
-// Deserialize parses json string to a structure of arbitrary type
+// Deserialize parses JSON string to a structure of arbitrary type
 func Deserialize(json string, s Any) error {
 	// TODO:
 	return nil
 }
 
 // Value returns any value of type interface{},
-// for map its a map, for array it's an array
+// for maps its map[string]Json, for arrays it's []Jzon
 func (jz *Jzon) Value(t ValueType) (v Any, err error) {
 	if jz.Type != t {
 		err = expectTypeOf(t, jz.Type)
