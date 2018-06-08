@@ -28,8 +28,8 @@ var typeStrings = []string{
 // Jzon defines a JSON node
 type Jzon struct {
 	Type ValueType
-	arr  []Jzon
-	obj  map[string]Jzon
+	arr  []*Jzon
+	obj  map[string]*Jzon
 	str  string
 	num  int64
 	flt  float64
@@ -39,13 +39,13 @@ type Jzon struct {
 // New allocates a Jzon node on heap
 func New(t ValueType) *Jzon {
 	v := Jzon{}
+	v.Type = t
 	switch t {
 	case JzTypeStr:
 	case JzTypeNum:
 	case JzTypeBol:
-	case JzTypeObj:
-		v.obj = make(map[string]Jzon)
-	case JzTypeArr:
+	case JzTypeObj: v.obj = make(map[string]*Jzon)
+	case JzTypeArr: v.arr = make([]*Jzon, 0)
 	case JzTypeNul:
 	}
 
@@ -53,10 +53,11 @@ func New(t ValueType) *Jzon {
 }
 
 // Parse parses string to Jzon
-func Parse(json string) (Jzon, string, error) {
+func Parse(json []byte) (*Jzon, error) {
 	pos.col = 0
 	pos.row = 0
-	return parse(json)
+	jz, _, err := parse(json)
+	return jz, err
 }
 
 // Number returns number value
@@ -96,7 +97,7 @@ func (jz *Jzon) Null() (n Any, err error) {
 }
 
 // Array returns array value
-func (jz *Jzon) Array() (a []Jzon, err error) {
+func (jz *Jzon) Array() (a []*Jzon, err error) {
 	if jz.Type != JzTypeArr {
 		return a, expectTypeOf(JzTypeArr, jz.Type)
 	}
@@ -105,9 +106,9 @@ func (jz *Jzon) Array() (a []Jzon, err error) {
 }
 
 // Object returns object value
-func (jz *Jzon) Object() (m map[string]Jzon, err error) {
-	if jz.Type != JzTypeArr {
-		return m, expectTypeOf(JzTypeArr, jz.Type)
+func (jz *Jzon) Object() (m map[string]*Jzon, err error) {
+	if jz.Type != JzTypeObj {
+		return m, expectTypeOf(JzTypeObj, jz.Type)
 	}
 
 	return jz.obj, nil
@@ -115,7 +116,7 @@ func (jz *Jzon) Object() (m map[string]Jzon, err error) {
 
 // ValueOf finds the value of the key in an object, if the node isn't
 // an object, or the key doesn't exist, an error will be thrown out
-func (jz *Jzon) ValueOf(k string) (v Jzon, err error) {
+func (jz *Jzon) ValueOf(k string) (v *Jzon, err error) {
 	if jz.Type != JzTypeObj {
 		err = expectTypeOf(JzTypeObj, jz.Type)
 		return
@@ -123,7 +124,7 @@ func (jz *Jzon) ValueOf(k string) (v Jzon, err error) {
 
 	v, ok := jz.obj[k]
 	if !ok {
-		err = errors.New("key dosen't exist")
+		err = errors.New("key doesn't exist")
 		return
 	}
 
@@ -132,7 +133,7 @@ func (jz *Jzon) ValueOf(k string) (v Jzon, err error) {
 
 // ValueAt finds the value at the index in an array, if the node isn't
 // an array, or the index is out of bound, an error will be thrown out
-func (jz *Jzon) ValueAt(i int) (v Jzon, err error) {
+func (jz *Jzon) ValueAt(i int) (v *Jzon, err error) {
 	if jz.Type != JzTypeArr {
 		err = expectTypeOf(JzTypeArr, jz.Type)
 		return
@@ -195,9 +196,9 @@ func (jz *Jzon) IsNull() bool {
 	return jz.Type == JzTypeNul
 }
 
-// Insert inserts a pair of key and value in an object, if it's not
+// Insert inserts a key with a value in an object, if it's not
 // an object, an error will be thrown out
-func (jz *Jzon) Insert(k string, v Jzon) (err error) {
+func (jz *Jzon) Insert(k string, v *Jzon) (err error) {
 	if jz.Type != JzTypeObj {
 		err = expectTypeOf(JzTypeObj, jz.Type)
 		return
@@ -209,7 +210,7 @@ func (jz *Jzon) Insert(k string, v Jzon) (err error) {
 
 // Append appends a node in an array, if it's not an array, an error
 // will be thrown out
-func (jz *Jzon) Append(v Jzon) (err error) {
+func (jz *Jzon) Append(v *Jzon) (err error) {
 	if jz.Type != JzTypeArr {
 		err = expectTypeOf(JzTypeArr, jz.Type)
 		return
@@ -263,18 +264,18 @@ func (jz *Jzon) AMap(itFunc func(g *Jzon) []Any) []Any {
 	var res []Any
 
 	for _, node := range jz.arr {
-		res = append(res, itFunc(&node))
+		res = append(res, itFunc(node))
 	}
 
 	return res
 }
 
 // AFilter is just filter for array
-func (jz *Jzon) AFilter(predictFunc func(g *Jzon) bool) []Jzon {
-	var res []Jzon
+func (jz *Jzon) AFilter(predictFunc func(g *Jzon) bool) []*Jzon {
+	var res []*Jzon
 
 	for _, node := range jz.arr {
-		if predictFunc(&node) {
+		if predictFunc(node) {
 			res = append(res, node)
 		}
 	}
@@ -287,7 +288,7 @@ func (jz *Jzon) Reduce(init Any, acc func(a *Jzon, b Any) Any) Any {
 	var res = init
 
 	for _, node := range jz.arr {
-		res = acc(&node, res)
+		res = acc(node, res)
 	}
 
 	return res
@@ -302,7 +303,7 @@ func (jz *Jzon) OMap(itFunc func(key string, g *Jzon) Any) []Any {
 	var res []Any = nil
 
 	for k, v := range jz.obj {
-		res = append(res, itFunc(k, &v))
+		res = append(res, itFunc(k, v))
 	}
 
 	return res
@@ -313,7 +314,7 @@ func (jz *Jzon) OFilter(predictFunc func(key string, value *Jzon) bool) Jzon {
 	var res = *jz
 
 	for k, v := range res.obj {
-		if !predictFunc(k, &v) {
+		if !predictFunc(k, v) {
 			res.Delete(k)
 		}
 	}
@@ -322,19 +323,15 @@ func (jz *Jzon) OFilter(predictFunc func(key string, value *Jzon) bool) Jzon {
 }
 
 // Map is just flat map which retrieves on each children node in the Jzon
-func (jz *Jzon) Map(mapFunc func(g *Jzon) Any) Any {
+func (jz *Jzon) Map(mapFunc func(string, *Jzon) Any) Any {
 	switch jz.Type {
 	case JzTypeArr:
-		return jz.AMap(func(g *Jzon) (res []Any) {
-			return append(res, mapFunc(g))
+		return jz.AMap(func(j *Jzon) (res []Any) {
+			return append(res, mapFunc("", j))
 		})
 	case JzTypeObj:
-		return jz.OMap(func(k string, v *Jzon) Any {
-			return mapFunc(v)
-		})
+		return jz.OMap(mapFunc)
 	default:
-		return mapFunc(jz)
+		return mapFunc("", jz)
 	}
-	// should never reach
-	return nil
 }

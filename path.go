@@ -13,3 +13,36 @@ func (jz *Jzon) SearchPath(path string) (exists bool) {
 	return
 }
 
+func parsePath(root *Jzon, path []byte) (closure func(jzon *Jzon) *Jzon, err error) {
+	var curr *Jzon
+	switch path[0] {
+	case '$':
+		// current: start
+		// enter:   dollar
+		// expect: '.' | '['
+		curr = root
+	case '.':
+		// current: dollar | key
+		// enter: key
+		// expect: alpha
+	case 'a','b':
+		// current: dollar | key
+		// enter: key
+		// expect: '.' | '['
+		key, path, err := parseKey(path)
+		if err != nil {
+			return nil, err
+		}
+		curr, err := curr.ValueOf(key)
+		return parsePath(curr, path)
+
+	case '[':
+		// current: dollar | key
+		// enter: key
+		// expect: '.' | '['
+	}
+
+	return
+}
+
+

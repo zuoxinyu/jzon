@@ -38,15 +38,11 @@ const (
 
 // Validator defines a validator to validate if a JSON value can be acceptable
 type Validator struct {
-	Type string
-	// Level defines the error level
-	Level int
-	// Reg verifies strings
-	Reg  regexp.Regexp
-	// Rng verifies numbers
-	Rng  Range
-	// Bol verifies bool
-	Bol  bool
+	Type string			// Type indicates this is used for validating which type
+	Level int 			// Level defines the error level
+	Reg  regexp.Regexp  // Reg verifies strings
+	Rng  Range 			// Rng verifies numbers
+	Bol  bool			// Bol verifies bool
 }
 
 // Range defines a numeric range, if the `Type` is RANGE_CLOSE,
@@ -121,8 +117,8 @@ func (v *Validator) Compile(cond string) (err error) {
 
 // Validate verifies this node by another JSON which has a particular format,
 // the given JSON should define the format of each field by a validator and
-// an level number. If there were some field can't pass the validator, the
-// level numbers would give errors respectively
+// an level number. If there were some fields can't pass the relying validator,
+// the level numbers would give errors respectively
 func (jz *Jzon) Validate(validator *Jzon) (ok bool, err error) {
 	return
 }

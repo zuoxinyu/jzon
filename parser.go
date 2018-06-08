@@ -2,8 +2,8 @@ package jzon
 
 import (
 	"fmt"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 type position struct {
@@ -18,23 +18,23 @@ func expect(c uint8, found uint8) error {
 }
 
 func expectTypeOf(ex ValueType, real ValueType) error {
-	return fmt.Errorf("expect node of type %s the real type is %s", typeStrings[ex], typeStrings[real])
+	return fmt.Errorf("expect node of type %s, but the real type is %s", typeStrings[ex], typeStrings[real])
 }
 
-func expectOneOf(pattern string, found uint8) error {
+func expectOneOf(pattern string, found byte) error {
 	st := strings.Join(strings.Split(pattern, ""), "|")
 	return fmt.Errorf("expect one of [%s] but found '%c' at [%d:%d]", st, found, pos.row, pos.col)
 }
 
-func expectString(pattern string, found string) error {
+func expectString(pattern string, found []byte) error {
 	return fmt.Errorf("expect \"%s\" but found \"%s\" at [%d:%d]", pattern, found, pos.row, pos.col)
 }
 
-func skipWhiteSpaces(str string) string {
+func skipWhiteSpaces(str []byte) []byte {
 	for {
 		switch str[0] {
 		case ' ', '\t':
-			pos.col += 1;
+			pos.col += 1
 			str = str[1:]
 			continue
 		case '\n', '\r':
@@ -50,7 +50,7 @@ func skipWhiteSpaces(str string) string {
 	return str
 }
 
-func parse(json string) (gson Jzon, rem string, err error) {
+func parse(json []byte) (jz *Jzon, rem []byte, err error) {
 	switch json[0] {
 	case '{':
 		return parseObj(json)
@@ -74,11 +74,10 @@ func parse(json string) (gson Jzon, rem string, err error) {
 	return
 }
 
-func parseObj(json string) (obj Jzon, rem string, err error) {
-	obj.Type = JzTypeObj
-	obj.obj = make(map[string]Jzon)
+func parseObj(json []byte) (obj *Jzon, rem []byte, err error) {
+	obj = New(JzTypeObj)
 	var k string
-	var v Jzon
+	var v *Jzon
 
 	// return empty object directly
 	oldPos := pos
@@ -118,9 +117,9 @@ func parseObj(json string) (obj Jzon, rem string, err error) {
 	return obj, rem[1:], nil
 }
 
-func parseArr(json string) (arr Jzon, rem string, err error) {
-	arr.Type = JzTypeArr
-	var v Jzon
+func parseArr(json []byte) (arr *Jzon, rem []byte, err error) {
+	arr = New(JzTypeArr)
+	var v *Jzon
 
 	// return empty array directly
 	oldPos := pos
@@ -160,18 +159,20 @@ func parseArr(json string) (arr Jzon, rem string, err error) {
 	return arr, rem[1:], nil
 }
 
-func parseStr(json string) (str Jzon, rem string, err error) {
+func parseStr(json []byte) (str *Jzon, rem []byte, err error) {
+	str = New(JzTypeStr)
 	var raw string
+
 	raw, rem, err = parseKey(json)
 	str.str = raw
 	return
 }
 
-func parseNum(json string) (num Jzon, rem string, err error) {
-	num.Type = JzTypeNum
+func parseNum(json []byte) (num *Jzon, rem []byte, err error) {
+	num = New(JzTypeNum)
 	digits := "0123456789"
 	if json[0] == '-' {
-		var neg = *New(JzTypeNum)
+		var neg = New(JzTypeNum)
 
 		pos.col++
 		neg, rem, err = parseNum(json[1:])
@@ -180,7 +181,7 @@ func parseNum(json string) (num Jzon, rem string, err error) {
 	}
 
 	var n int64
-	_, err = fmt.Sscanf(json, "%d", &n)
+	_, err = fmt.Sscanf(string(json), "%d", &n)
 	if err != nil {
 		err = expectOneOf(digits, json[0])
 		return
@@ -192,9 +193,9 @@ func parseNum(json string) (num Jzon, rem string, err error) {
 	return num, json[nparsed:], nil
 }
 
-func parseTru(json string) (bol Jzon, rem string, err error) {
-	bol.Type = JzTypeBol
-	if json[0:4] == "true" {
+func parseTru(json []byte) (bol *Jzon, rem []byte, err error) {
+	bol = New(JzTypeBol)
+	if string(json[0:4]) == "true" {
 		bol.bol = true
 		pos.col += 4
 		return bol, json[4:], nil
@@ -204,9 +205,9 @@ func parseTru(json string) (bol Jzon, rem string, err error) {
 	}
 }
 
-func parseFls(json string) (bol Jzon, rem string, err error) {
-	bol.Type = JzTypeBol
-	if json[0:5] == "false" {
+func parseFls(json []byte) (bol *Jzon, rem []byte, err error) {
+	bol = New(JzTypeBol)
+	if string(json[0:5]) == "false" {
 		bol.bol = false
 		pos.col += 5
 		return bol, json[5:], nil
@@ -216,9 +217,9 @@ func parseFls(json string) (bol Jzon, rem string, err error) {
 	}
 }
 
-func parseNul(json string) (nul Jzon, rem string, err error) {
-	nul.Type = JzTypeNul
-	if json[0:4] == "null" {
+func parseNul(json []byte) (nul *Jzon, rem []byte, err error) {
+	nul = New(JzTypeNul)
+	if string(json[0:4]) == "null" {
 		pos.col += 4
 		return nul, json[4:], nil
 	} else {
@@ -227,7 +228,35 @@ func parseNul(json string) (nul Jzon, rem string, err error) {
 	}
 }
 
-func parseKey(json string) (k string, rem string, err error) {
+func parseKVPair(json []byte) (k string, v *Jzon, rem []byte, err error) {
+	json = skipWhiteSpaces(json)
+
+	if json[0] == '"' {
+		k, rem, err = parseKey(json)
+		if err != nil {
+			return
+		}
+
+		rem = skipWhiteSpaces(rem)
+		if rem[0] != ':' {
+			err = expect(':', rem[0])
+			return
+		}
+
+		pos.col++
+		v, rem, err = parse(rem[1:])
+		if err != nil {
+			return
+		}
+
+		return
+	}
+
+	err = expect('"', json[0])
+	return
+}
+
+func parseKey(json []byte) (k string, rem []byte, err error) {
 	// TODO: handle unicode and escaped characters
 	pos.col++
 	rem = json[1:]
@@ -252,35 +281,7 @@ func parseKey(json string) (k string, rem string, err error) {
 		return
 	}
 
-	pos.col += x+1
-	return rem[0:x], rem[x+1:],nil
-}
-
-func parseKVPair(json string) (k string, v Jzon, rem string, err error) {
-	json = skipWhiteSpaces(json)
-
-	if json[0] == '"' {
-		k, rem, err = parseKey(json)
-		if err != nil {
-			return
-		}
-
-		rem = skipWhiteSpaces(rem)
-		if rem[0] != ':' {
-			err = expect(':', rem[0])
-			return
-		}
-
-		pos.col++
-		v, rem, err = parse(rem[1:])
-		if err != nil {
-			return
-		}
-
-		return k, v, rem, err
-	}
-
-	err = expect('"', json[0])
-	return
+	pos.col += x + 1
+	return string(rem[0:x]), rem[x+1:], nil
 }
 
