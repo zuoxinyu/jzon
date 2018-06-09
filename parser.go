@@ -11,10 +11,32 @@ type position struct {
 	col int
 }
 
+// pos is the global position info. NOTE: it makes the function parse
+// non-reentrant. to fix this, move it inner the function as a stack variable
 var pos position
 
+// SHORT_STRING_OPTIMIZED_CAP assumes that 16 was the most common length
+// among short strings. NOTE: need profiling to find a best capacity,
+// or supply an API let users modify it dynamically
+const SHORT_STRING_OPTIMIZED_CAP = 16
+
+// firstByteMarkMap is the first-byte-mark
+var firstByteMarkMap = [...]uint32{0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC}
+
+// escapeMap is for fast converting escapable characters
+var escapeMap = map[byte]byte{
+	'"':  '"',
+	'/':  '/',
+	'\\': '\\',
+	'b':  '\b',
+	'f':  '\f',
+	'n':  '\n',
+	'r':  '\r',
+	't':  '\t',
+}
+
 func expect(c uint8, found uint8) error {
-	return fmt.Errorf("expect '%c' but found '%c' at [%d:%d]", c, found, pos.row, pos.col)
+	return fmt.Errorf("expect '%c' but found '%c' at [%d:%d]", c, found, pos.row+1, pos.col+1)
 }
 
 func expectTypeOf(ex ValueType, real ValueType) error {
@@ -23,14 +45,18 @@ func expectTypeOf(ex ValueType, real ValueType) error {
 
 func expectOneOf(pattern string, found byte) error {
 	st := strings.Join(strings.Split(pattern, ""), "|")
-	return fmt.Errorf("expect one of [%s] but found '%c' at [%d:%d]", st, found, pos.row, pos.col)
+	return fmt.Errorf("expect one of [%s] but found '%c' at [%d:%d]", st, found, pos.row+1, pos.col+1)
 }
 
 func expectString(pattern string, found []byte) error {
-	return fmt.Errorf("expect \"%s\" but found \"%s\" at [%d:%d]", pattern, found, pos.row, pos.col)
+	return fmt.Errorf("expect \"%s\" but found \"%s\" at [%d:%d]", pattern, found, pos.row+1, pos.col+1)
 }
 
-func skipWhiteSpaces(str []byte) []byte {
+func expectCodePoint() error {
+	return fmt.Errorf("expect \"\\uXXXX\" formed string as valide Unicode codepoint at [%d:%d]", pos.row+1, pos.col+1)
+}
+
+func trimWhiteSpaces(str []byte) []byte {
 	for {
 		switch str[0] {
 		case ' ', '\t':
@@ -67,11 +93,10 @@ func parse(json []byte) (jz *Jzon, rem []byte, err error) {
 	case '-', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0':
 		return parseNum(json)
 	case ' ', '\t', '\r', '\n':
-		return parse(skipWhiteSpaces(json))
+		return parse(trimWhiteSpaces(json))
+	default:
+		return nil, json, expectOneOf("{[\"-1234567890ftn", json[0])
 	}
-
-	err = expectOneOf("{[\"-1234567890ftn", json[0])
-	return
 }
 
 func parseObj(json []byte) (obj *Jzon, rem []byte, err error) {
@@ -80,8 +105,8 @@ func parseObj(json []byte) (obj *Jzon, rem []byte, err error) {
 	var v *Jzon
 
 	// return empty object directly
-	oldPos := pos
-	try := skipWhiteSpaces(json[1:])
+	var oldPos = pos
+	try := trimWhiteSpaces(json[1:])
 	if try[0] == '}' {
 		pos.col++
 		return obj, try[1:], nil
@@ -99,7 +124,7 @@ func parseObj(json []byte) (obj *Jzon, rem []byte, err error) {
 
 		obj.obj[k] = v
 
-		rem = skipWhiteSpaces(rem)
+		rem = trimWhiteSpaces(rem)
 		if rem[0] == ',' {
 			continue
 		}
@@ -107,7 +132,7 @@ func parseObj(json []byte) (obj *Jzon, rem []byte, err error) {
 		break
 	}
 
-	rem = skipWhiteSpaces(rem)
+	rem = trimWhiteSpaces(rem)
 	if rem[0] != '}' {
 		err = expectOneOf("},", rem[0])
 		return
@@ -122,8 +147,8 @@ func parseArr(json []byte) (arr *Jzon, rem []byte, err error) {
 	var v *Jzon
 
 	// return empty array directly
-	oldPos := pos
-	try := skipWhiteSpaces(json[1:])
+	var oldPos = pos
+	try := trimWhiteSpaces(json[1:])
 	if try[0] == ']' {
 		pos.col++
 		return arr, try[1:], nil
@@ -141,7 +166,7 @@ func parseArr(json []byte) (arr *Jzon, rem []byte, err error) {
 
 		arr.arr = append(arr.arr, v)
 
-		rem = skipWhiteSpaces(rem)
+		rem = trimWhiteSpaces(rem)
 		if rem[0] == ',' {
 			continue
 		}
@@ -149,7 +174,7 @@ func parseArr(json []byte) (arr *Jzon, rem []byte, err error) {
 		break
 	}
 
-	rem = skipWhiteSpaces(rem)
+	rem = trimWhiteSpaces(rem)
 	if rem[0] != ']' {
 		err = expectOneOf("],", rem[0])
 		return
@@ -170,7 +195,8 @@ func parseStr(json []byte) (str *Jzon, rem []byte, err error) {
 
 func parseNum(json []byte) (num *Jzon, rem []byte, err error) {
 	num = New(JzTypeNum)
-	digits := "0123456789"
+	var digits = "0123456789"
+
 	if json[0] == '-' {
 		var neg = New(JzTypeNum)
 
@@ -229,7 +255,7 @@ func parseNul(json []byte) (nul *Jzon, rem []byte, err error) {
 }
 
 func parseKVPair(json []byte) (k string, v *Jzon, rem []byte, err error) {
-	json = skipWhiteSpaces(json)
+	json = trimWhiteSpaces(json)
 
 	if json[0] == '"' {
 		k, rem, err = parseKey(json)
@@ -237,7 +263,7 @@ func parseKVPair(json []byte) (k string, v *Jzon, rem []byte, err error) {
 			return
 		}
 
-		rem = skipWhiteSpaces(rem)
+		rem = trimWhiteSpaces(rem)
 		if rem[0] != ':' {
 			err = expect(':', rem[0])
 			return
@@ -257,31 +283,162 @@ func parseKVPair(json []byte) (k string, v *Jzon, rem []byte, err error) {
 }
 
 func parseKey(json []byte) (k string, rem []byte, err error) {
-	// TODO: handle unicode and escaped characters
+	var parsed = make([]byte, 0, SHORT_STRING_OPTIMIZED_CAP)
+	var c byte
+
 	pos.col++
 	rem = json[1:]
-	x := 0
 
-	// return empty string directly
 	if rem[0] == '"' {
-		pos.col++
+		pos.col += 1
 		return "", rem[1:], nil
 	}
 
-	for i, c := range rem {
-		if c == '"' && i != 0 && rem[i-1] != '\\' {
+	for {
+		switch {
+		case rem[0] != '\\' && rem[1] == '"':
+			parsed = append(parsed, rem[0])
+			pos.col += 2
+			rem = rem[2:]
 			break
-		}
 
-		x += 1
+		case rem[0] == '\\' && rem[1] == 'u':
+			utf8str := make([]byte, 0, SHORT_STRING_OPTIMIZED_CAP)
+			utf8str, rem, err = parseUnicode(rem)
+			for _, c := range utf8str {
+				parsed = append(parsed, c)
+			}
+
+		case rem[0] == '\\' && rem[1] != 'u':
+			c, rem, err = parseEscaped(rem)
+			if err != nil {
+				return
+			}
+			parsed = append(parsed, c)
+
+		default:
+			parsed = append(parsed, rem[0])
+			pos.col += 1
+			rem = rem[1:]
+		}
 	}
 
-	if x == len(rem)-1 {
-		err = expect('"', 0)
+	return string(parsed), rem, nil
+}
+
+func parseEscaped(json []byte) (escaped byte, rem []byte, err error) {
+	rem = json
+	escaped, ok := escapeMap[rem[1]]
+	if !ok {
+		err = expectOneOf("\"\\/bfnrtu", rem[1])
 		return
 	}
 
-	pos.col += x + 1
-	return string(rem[0:x]), rem[x+1:], nil
+	pos.col += 2
+	rem = rem[2:]
+	return escaped, rem, nil
 }
 
+func parseUnicode(json []byte) (parsed []byte, rem []byte, err error) {
+	var uc, uc2 uint32
+	var isValidUnicodePoint = func(cp uint32) bool {
+		return 0xDC00 <= cp && cp <= 0xDFFF || cp == 0
+	}
+
+	rem = json[2:]
+	pos.col += 2
+
+	uc, rem, err = parseHex4(rem)
+	if err != nil {
+		return
+	}
+
+	if isValidUnicodePoint(uc) {
+		err = expectCodePoint()
+		return
+	}
+
+	if 0xD800 <= uc && uc <= 0xDBFF {
+		if !(rem[0] == '\\' && rem[1] == 'u') {
+			err = expectCodePoint()
+			return
+		}
+
+		rem = rem[2:]
+		pos.col += 2
+
+		uc2, rem, err = parseHex4(rem)
+		if err != nil {
+			return
+		}
+
+		if isValidUnicodePoint(uc2) {
+			err = expectCodePoint()
+			return
+		}
+
+		uc = 0x10000 + ((uc&0x3FF)<<10 | uc2&0x3FF)
+	}
+
+	var length int
+	switch {
+	case uc < 0x80:
+		length = 1
+	case uc < 0x800:
+		length = 2
+	case uc < 0x10000:
+		length = 3
+	default:
+		length = 4
+	}
+
+	parsed = []byte{0, 0, 0, 0}
+
+	switch length {
+	case 4:
+		parsed[3] = byte(uc | 0x80&0xBF)
+		uc >>= 6
+		fallthrough
+	case 3:
+		parsed[2] = byte(uc | 0x80&0xBF)
+		uc >>= 6
+		fallthrough
+	case 2:
+		parsed[1] = byte(uc | 0x80&0xBF)
+		uc >>= 6
+		fallthrough
+	case 1:
+		parsed[0] = byte(uc | firstByteMarkMap[length])
+	}
+
+	var realParsed []byte
+	for _, c := range parsed {
+		if c != 0 {
+			realParsed = append(realParsed, c)
+		}
+	}
+
+	return realParsed, rem, nil
+}
+
+func parseHex4(json []byte) (hex uint32, rem []byte, err error) {
+	rem = json
+	for i := 0; i < 4; i++ {
+		switch {
+		case '0' <= rem[i] && rem[i] <= '9':
+			hex += uint32(rem[i] - '0')
+		case 'A' <= rem[i] && rem[i] <= 'F':
+			hex += uint32(10 + rem[i] - 'A')
+		case 'a' <= rem[i] && rem[i] <= 'f':
+			hex += uint32(10 + rem[i] - 'a')
+		default:
+			err = expectOneOf("0123456789ABCDEF", rem[i])
+			return
+		}
+
+		hex = hex << 4
+		pos.col += 1
+	}
+
+	return hex, rem[4:], nil
+}
