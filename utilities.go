@@ -6,23 +6,23 @@ import (
 )
 
 // Format converts raw compact JSON to human-reading text
-func Format(compact string, indent int, useTab bool) string {
+func Format(compact string, indent int, useTab bool) (formatted string, err error) {
 	jz, err := Parse([]byte(compact))
 	if err != nil {
-		panic(err)
+	    return
 	}
 
-	return jz.Format(indent, useTab)
+	return jz.Format(indent, useTab), nil
 }
 
 // Compact converts formatted JSON to compact text
-func Compact(formatted string) string {
+func Compact(formatted string) (compact string, err error) {
 	jz, err := Parse([]byte(formatted))
 	if err != nil {
-		panic(err)
+	    return
 	}
 
-	return jz.Compact()
+	return jz.Compact(), nil
 }
 
 // Format generates human-reading text

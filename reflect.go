@@ -13,7 +13,7 @@ func Deserialize(json string, s Any) error {
 }
 
 // Value returns any value of type interface{},
-// for maps its map[string]Json, for arrays it's []Jzon
+// for maps its map[string]*Jzon, for arrays it's []*Jzon
 func (jz *Jzon) Value(t ValueType) (v Any, err error) {
 	if jz.Type != t {
 		err = expectTypeOf(t, jz.Type)
