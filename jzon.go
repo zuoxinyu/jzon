@@ -165,7 +165,7 @@ func (jz *Jzon) Keys() (ks []string, err error) {
 		return ks, expectTypeOf(JzTypeObj, jz.Type)
 	}
 
-	for k, _ := range jz.obj {
+	for k := range jz.obj {
 		ks = append(ks, k)
 	}
 
@@ -280,7 +280,7 @@ func (jz *Jzon) AFilter(predictFunc func(g *Jzon) bool) (res []*Jzon, err error)
 }
 
 // AReduce is just reduce for array
-func (jz *Jzon) Reduce(init Any, acc func(a *Jzon, b Any) Any) (res Any, err error) {
+func (jz *Jzon) AReduce(init Any, acc func(a *Jzon, b Any) Any) (res Any, err error) {
 	res = init
 
 	for _, node := range jz.arr {
@@ -307,19 +307,19 @@ func (jz *Jzon) OMap(itFunc func(key string, g *Jzon) Any) (res []Any, err error
 
 // OFilter is just filter for object
 func (jz *Jzon) OFilter(predictFunc func(key string, value *Jzon) bool) (res *Jzon, err error) {
-	var new Jzon = *jz
+	var tmp Jzon = *jz
 
-	for k, v := range new.obj {
+	for k, v := range tmp.obj {
 		if !predictFunc(k, v) {
-			new.Delete(k)
+			tmp.Delete(k)
 		}
 	}
 
-	res = &new
+	res = &tmp
 	return res, nil
 }
 
-// Map is just flat map which retrieves on each children node in self
+// Map is just flat map which retrieves on each children node of self
 func (jz *Jzon) Map(mapFunc func(string, *Jzon) Any) (res Any, err error) {
 	switch jz.Type {
 	case JzTypeArr:

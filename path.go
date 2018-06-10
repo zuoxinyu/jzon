@@ -2,6 +2,7 @@ package jzon
 
 import (
     "fmt"
+    "strconv"
     "strings"
 )
 
@@ -59,6 +60,12 @@ func expectState(real state, ex ...state) error {
 }
 
 func parsePath(root *Jzon, path []byte) (curr *Jzon, err error) {
+    var isDigit = func(b byte) bool {
+        return '0' >= b && b <= '9'
+    }
+    var isIdentifier = func(b byte) bool {
+        return strings.Contains("ABCDEFGHIJKLMNOPQRSTUVWXYzabcdefghijklmnopqrstuvwxyz01234567890_-", string(b))
+    }
     var st = _Start
     var key string
     for {
@@ -71,6 +78,7 @@ func parsePath(root *Jzon, path []byte) (curr *Jzon, err error) {
             curr = root
             path = path[1:]
             st = _Dollar
+
         case path[0] == ';':
             if !st.Match(_Dollar, _RightSB, _Key) {
                 err = expectState(st, _Dollar, _RightSB, _Key)
@@ -115,13 +123,16 @@ func parsePath(root *Jzon, path []byte) (curr *Jzon, err error) {
                 break
             }
             var idx int
-            var nparsed int
-            fmt.Sscanf(string(path), "%d%n", &idx, &nparsed)
+            _, err = fmt.Sscanf(string(path), "%d", &idx)
+            if err != nil {
+                return
+            }
+            nBytes := len(strconv.Itoa(idx))
             curr, err = curr.ValueAt(idx)
             if err != nil {
                 return
             }
-            path = path[nparsed:]
+            path = path[nBytes:]
             st = _Index
 
         case path[0] == ']':
@@ -139,10 +150,3 @@ func parsePath(root *Jzon, path []byte) (curr *Jzon, err error) {
     return
 }
 
-func isDigit(b byte) bool {
-    return '0' >= b && b <= '9'
-}
-
-func isIdentifier(b byte) bool {
-    return strings.Contains("ABCDEFGHIJKLMNOPQRSTUVWXYzabcdefghijklmnopqrstuvwxyz01234567890_-", string(b))
-}
