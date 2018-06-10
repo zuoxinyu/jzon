@@ -1,19 +1,19 @@
 package jzon
 
 // Serialize parses a tagged structure to Jzon
-func Serialize(s Any) Jzon {
+func Serialize(s Any) (jz Jzon) {
 	// TODO:
-	return Jzon{}
+	return
 }
 
 // Deserialize parses JSON string to a structure of arbitrary type
-func Deserialize(json string, s Any) error {
+func Deserialize(json string, s Any) (err error) {
 	// TODO:
-	return nil
+	return
 }
 
-// Value returns any value of type interface{},
-// for maps its map[string]*Jzon, for arrays it's []*Jzon
+// Value returns value of type interface{}, for maps
+// it's a map[string]*Jzon, for arrays it's []*Jzon
 func (jz *Jzon) Value(t ValueType) (v Any, err error) {
 	if jz.Type != t {
 		err = expectTypeOf(t, jz.Type)

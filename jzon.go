@@ -2,6 +2,7 @@ package jzon
 
 import (
 	"errors"
+    "fmt"
 )
 
 type ValueType int
@@ -36,7 +37,7 @@ var typeStrings = []string{
 	"JzTypeNul",
 }
 
-// New allocates a Jzon node on heap
+// New allocates a Jzon node on the heap
 func New(t ValueType) *Jzon {
 	v := Jzon{}
 	v.Type = t
@@ -54,15 +55,25 @@ func New(t ValueType) *Jzon {
 	return &v
 }
 
-// Parse parses string to Jzon
-func Parse(json []byte) (*Jzon, error) {
+// Parse parses string to Jzon, any errors occurred in the parsing will be thrown out
+func Parse(json []byte) (jz *Jzon, err error) {
+    // in the implements of function `parse()` we don't handle any
+    // exceptions about slice bounds out of range. here we simply
+    // throw the error recovered from those unhandled exceptions
+    defer func() {
+        e := recover()
+        if e != nil {
+            err = fmt.Errorf("maybe out of bound: %v", e)
+        }
+    }()
+
 	pos.col = 0
 	pos.row = 0
-	jz, _, err := parse(json)
+	jz, _, err = parse(json)
 	return jz, err
 }
 
-// Number returns number value
+// Number returns number value, if it's not a number, an error will be thrown out
 func (jz *Jzon) Number() (n int64, err error) {
 	if jz.Type != JzTypeNum {
 		return n, expectTypeOf(JzTypeNum, jz.Type)
@@ -71,7 +82,7 @@ func (jz *Jzon) Number() (n int64, err error) {
 	return jz.num, nil
 }
 
-// String returns string value
+// String returns string value, if it's not a string, an error will be thrown out
 func (jz *Jzon) String() (s string, err error) {
 	if jz.Type != JzTypeStr {
 		return s, expectTypeOf(JzTypeStr, jz.Type)
@@ -80,7 +91,7 @@ func (jz *Jzon) String() (s string, err error) {
 	return jz.str, nil
 }
 
-// Bool returns bool value
+// Bool returns bool value, if it's not a boolean, an error will be thrown out
 func (jz *Jzon) Bool() (b bool, err error) {
 	if jz.Type != JzTypeBol {
 		return b, expectTypeOf(JzTypeBol, jz.Type)
@@ -89,7 +100,7 @@ func (jz *Jzon) Bool() (b bool, err error) {
 	return jz.bol, nil
 }
 
-// Null returns null value (as nil)
+// Null returns nil value, if it's not a boolean, an error will be thrown out
 func (jz *Jzon) Null() (n Any, err error) {
 	if jz.Type != JzTypeNul {
 		return nil, expectTypeOf(JzTypeNul, jz.Type)
@@ -98,7 +109,7 @@ func (jz *Jzon) Null() (n Any, err error) {
 	return nil, nil
 }
 
-// Array returns array value
+// Array returns array value, if it's not an array, an error will be thrown out
 func (jz *Jzon) Array() (a []*Jzon, err error) {
 	if jz.Type != JzTypeArr {
 		return a, expectTypeOf(JzTypeArr, jz.Type)
@@ -107,7 +118,7 @@ func (jz *Jzon) Array() (a []*Jzon, err error) {
 	return jz.arr, nil
 }
 
-// Object returns object value
+// Object returns object value, if it's not an object, an error will be thrown out
 func (jz *Jzon) Object() (m map[string]*Jzon, err error) {
 	if jz.Type != JzTypeObj {
 		return m, expectTypeOf(JzTypeObj, jz.Type)
@@ -116,8 +127,8 @@ func (jz *Jzon) Object() (m map[string]*Jzon, err error) {
 	return jz.obj, nil
 }
 
-// ValueOf finds the value of the key in an object, if the node isn't
-// an object, or the key doesn't exist, an error will be thrown out
+// ValueOf finds the value of the key in an object, if it's not an object
+// or the key does not exist in this object, an error will be thrown out
 func (jz *Jzon) ValueOf(k string) (v *Jzon, err error) {
 	if jz.Type != JzTypeObj {
 		return v, expectTypeOf(JzTypeObj, jz.Type)
@@ -132,8 +143,8 @@ func (jz *Jzon) ValueOf(k string) (v *Jzon, err error) {
 	return v, nil
 }
 
-// ValueAt finds the value at the index in an array, if the node isn't
-// an array, or the index is out of bound, an error will be thrown out
+// ValueAt finds the value at the index in an array, if it's not an
+// array or the index is out of bound, an error will be thrown out
 func (jz *Jzon) ValueAt(i int) (v *Jzon, err error) {
 	if jz.Type != JzTypeArr {
 		return v, expectTypeOf(JzTypeArr, jz.Type)
@@ -147,8 +158,8 @@ func (jz *Jzon) ValueAt(i int) (v *Jzon, err error) {
 	return jz.arr[i], nil
 }
 
-// Has returns whether the object has the key, if it's not an object
-// an error will be thrown out
+// Has returns if this object has the given key, if
+// it's not an object, an error will be thrown out
 func (jz *Jzon) Has(k string) (has bool, err error) {
 	if jz.Type != JzTypeObj {
 		return has, expectTypeOf(JzTypeArr, jz.Type)
@@ -158,7 +169,7 @@ func (jz *Jzon) Has(k string) (has bool, err error) {
 	return ok, nil
 }
 
-// Keys returns the total keys as an string slice in an object,
+// Keys returns all keys as an string slice in object,
 // if it's not an object, an error will be thrown out
 func (jz *Jzon) Keys() (ks []string, err error) {
 	if jz.Type != JzTypeObj {
@@ -172,8 +183,8 @@ func (jz *Jzon) Keys() (ks []string, err error) {
 	return ks, nil
 }
 
-// Length returns the length of an object or an array, if it's an object, then
-// just return the number of keys, otherwise an error will be thrown out
+// Length returns the length of an object or an array, if it is an object,
+// just returns the number of keys, otherwise an error will be thrown out
 func (jz *Jzon) Length() (l int, err error) {
 	if jz.Type == JzTypeArr {
 		return len(jz.arr), nil
@@ -192,8 +203,8 @@ func (jz *Jzon) IsNull() bool {
 	return jz.Type == JzTypeNul
 }
 
-// Insert inserts a key with a value in an object, if it's not
-// an object, an error will be thrown out
+// Insert inserts a key with a node in an object, or replaces the value for the key
+// when the key already exists. if it's not an object, an error will be thrown out
 func (jz *Jzon) Insert(k string, v *Jzon) (err error) {
 	if jz.Type != JzTypeObj {
 		return expectTypeOf(JzTypeObj, jz.Type)
@@ -203,8 +214,7 @@ func (jz *Jzon) Insert(k string, v *Jzon) (err error) {
 	return nil
 }
 
-// Append appends a node in an array, if it's not an array, an error
-// will be thrown out
+// Append appends a node after an array, if it's not an array, an error will be thrown out
 func (jz *Jzon) Append(v *Jzon) (err error) {
 	if jz.Type != JzTypeArr {
 		return expectTypeOf(JzTypeArr, jz.Type)
@@ -225,8 +235,8 @@ func (jz *Jzon) Delete(k string) (err error) {
 	return nil
 }
 
-// Remove removes a node at index in an array, it's safe to delete an index
-// which doesn't exist, if it's not an object, an error will be thrown out
+// Remove removes an index in an array, it's safe to delete an index
+// doesn't exist, if it's not an array, an error will be thrown out
 func (jz *Jzon) Remove(i int) (err error) {
 	if jz.Type != JzTypeArr {
 		return expectTypeOf(JzTypeArr, jz.Type)
@@ -247,7 +257,7 @@ func (jz *Jzon) Remove(i int) (err error) {
 	return nil
 }
 
-// AMap is just map for array
+// AMap is just map for array, if it's not an array, an error will be thrown out
 func (jz *Jzon) AMap(itFunc func(g *Jzon) []Any) (res []Any, err error) {
 	if jz.Type != JzTypeArr {
 		return res, expectTypeOf(JzTypeArr, jz.Type)
@@ -262,7 +272,7 @@ func (jz *Jzon) AMap(itFunc func(g *Jzon) []Any) (res []Any, err error) {
 	return res, nil
 }
 
-// AFilter is just filter for array
+// AFilter is just filter for array, if it's not an array, an error will be thrown out
 func (jz *Jzon) AFilter(predictFunc func(g *Jzon) bool) (res []*Jzon, err error) {
 	if jz.Type != JzTypeArr {
 		return res, expectTypeOf(JzTypeArr, jz.Type)
@@ -279,8 +289,12 @@ func (jz *Jzon) AFilter(predictFunc func(g *Jzon) bool) (res []*Jzon, err error)
 	return res, nil
 }
 
-// AReduce is just reduce for array
+// AReduce is just reduce for array, if it's not an object, an error will be thrown out
 func (jz *Jzon) AReduce(init Any, acc func(a *Jzon, b Any) Any) (res Any, err error) {
+    if jz.Type != JzTypeArr {
+        return res, expectTypeOf(JzTypeArr, jz.Type)
+    }
+
 	res = init
 
 	for _, node := range jz.arr {
@@ -290,7 +304,7 @@ func (jz *Jzon) AReduce(init Any, acc func(a *Jzon, b Any) Any) (res Any, err er
 	return res, nil
 }
 
-// OMap is just map for object
+// OMap is just map for object, if it's not an object, an error will be thrown out
 func (jz *Jzon) OMap(itFunc func(key string, g *Jzon) Any) (res []Any, err error) {
 	if jz.Type != JzTypeObj {
 		return res, expectTypeOf(JzTypeObj, jz.Type)
@@ -305,8 +319,12 @@ func (jz *Jzon) OMap(itFunc func(key string, g *Jzon) Any) (res []Any, err error
 	return res, nil
 }
 
-// OFilter is just filter for object
+// OFilter is just filter for object, if it's not an object, an error will be thrown out
 func (jz *Jzon) OFilter(predictFunc func(key string, value *Jzon) bool) (res *Jzon, err error) {
+    if jz.Type != JzTypeObj{
+        return res, expectTypeOf(JzTypeObj, jz.Type)
+    }
+
 	var tmp Jzon = *jz
 
 	for k, v := range tmp.obj {
@@ -319,7 +337,7 @@ func (jz *Jzon) OFilter(predictFunc func(key string, value *Jzon) bool) (res *Jz
 	return res, nil
 }
 
-// Map is just flat map which retrieves on each children node of self
+// Map is just flat map which retrieves on each children node of itself
 func (jz *Jzon) Map(mapFunc func(string, *Jzon) Any) (res Any, err error) {
 	switch jz.Type {
 	case JzTypeArr:

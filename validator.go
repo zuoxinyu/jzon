@@ -70,7 +70,7 @@ func (rng *Range) CanAccept(n int64) bool {
     return false
 }
 
-func compileCondition(cond string) (Validator, error) {
+func compileCondition(cond string) (fn Validator, err error) {
     switch {
     case strings.HasPrefix(cond, COND_REGEXP) :
         return compileRegExp(cond)
@@ -89,7 +89,7 @@ func compileCondition(cond string) (Validator, error) {
         COND_REGEXP, COND_BOOL, COND_NULL, COND_RANGE, cond)
 }
 
-func compileRegExp(cond string) (Validator, error) {
+func compileRegExp(cond string) (fn Validator, err error) {
     reg, err := regexp.Compile(strings.TrimPrefix(cond, COND_REGEXP))
     if err != nil {
         return nil, err
@@ -105,7 +105,7 @@ func compileRegExp(cond string) (Validator, error) {
 
 }
 
-func compileRange(cond string) (Validator, error) {
+func compileRange(cond string) (fn Validator, err error) {
     var rng Range
     rangeStr := strings.TrimPrefix(cond, COND_RANGE)
     nParsed, err := fmt.Sscanf(rangeStr, "%d,%d", &rng.LowerBound, &rng.UpperBound)
@@ -126,7 +126,7 @@ func compileRange(cond string) (Validator, error) {
     }, nil
 }
 
-func compileBool(cond string) (Validator, error) {
+func compileBool(cond string) (fn Validator, err error) {
     boolStr := strings.TrimPrefix(cond, COND_BOOL)
     var b bool
     if boolStr == "true" {
@@ -150,7 +150,7 @@ func compileBool(cond string) (Validator, error) {
     }, nil
 }
 
-func compileNull(cond string) (Validator, error) {
+func compileNull(cond string) (fn Validator, err error) {
     nullStr := strings.TrimPrefix(cond, COND_NULL)
     if nullStr == "null" {
         return func(jz *Jzon) bool {
@@ -162,9 +162,10 @@ func compileNull(cond string) (Validator, error) {
 
 // Validate verifies this node by another JSON which has a particular grammar,
 // the given JSON should define the format of each field by a validator and a
-// level number. If there were some fields can't pass the relying validator,
-// the level numbers would give errors respectively
-func (jz *Jzon) Validate(validator *Jzon) (ok bool, err error) {
+// level number. If there were any fields can't pass the relying validators,
+// `Validate` would generate detailed report into another JSON respectively
+func (jz *Jzon) Validate(validator *Jzon) (ok bool, report *Jzon, err error) {
+    // TODO:
     return
 }
 

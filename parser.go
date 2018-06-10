@@ -4,6 +4,7 @@ import (
     "fmt"
     "strconv"
     "strings"
+    "runtime"
 )
 
 type position struct {
@@ -11,20 +12,20 @@ type position struct {
     col int
 }
 
-// pos is the global variable indicates the parsing step info.
-// NOTE: it makes the function `parse` non-reentrant.
-// to fix this, move it inner the function as a stack variable
+// pos is the global variable indicates the parsing step info
+// NOTE: it makes the function `parse()` none re-entrant. to
+// fix this, move it inner the function as a stack variable
 var pos position
 
-// SHORT_STRING_OPTIMIZED_CAP assumes that 16 was the most common length
-// among short strings. NOTE: need profiling to find a best capacity,
-// or supply an API let users modify it dynamically
+// SHORT_STRING_OPTIMIZED_CAP assumes that 16 was the most common
+// length among short strings. NOTE: it need profiling to find a
+// best capacity, or supply API let users modify it dynamically
 const SHORT_STRING_OPTIMIZED_CAP = 16
 
 // firstByteMarkMap is the first-byte-mark table in UTF-8 encoding
 var firstByteMarkMap = [...]uint32{0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC}
 
-// escapeMap is for fast converting escapable characters
+// escapeMap is for fast converting escape-able characters
 var escapeMap = map[byte]byte{
     '"':  '"',
     '/':  '/',
@@ -58,13 +59,21 @@ func expectCodePoint() error {
 }
 
 func trimWhiteSpaces(str []byte) []byte {
+    isWindows := runtime.GOOS == "windows"
     for {
-        switch str[0] {
-        case ' ', '\t':
+        switch {
+        case string(str[0:2]) == "\r\n" && isWindows:
+            pos.row += 1
+            pos.col = 0
+            str = str[2:]
+            continue
+
+        case str[0] == ' ' || str[0] == '\t':
             pos.col += 1
             str = str[1:]
             continue
-        case '\n', '\r':
+
+        case str[0] == '\n' || str[0] == '\r':
             pos.row += 1
             pos.col = 0
             str = str[1:]
@@ -107,10 +116,10 @@ func parseObj(json []byte) (obj *Jzon, rem []byte, err error) {
 
     // return empty object directly
     var oldPos = pos
-    try := trimWhiteSpaces(json[1:])
-    if try[0] == '}' {
+    trimmed := trimWhiteSpaces(json[1:])
+    if trimmed[0] == '}' {
         pos.col++
-        return obj, try[1:], nil
+        return obj, trimmed[1:], nil
     }
     // recover
     pos = oldPos
@@ -149,10 +158,10 @@ func parseArr(json []byte) (arr *Jzon, rem []byte, err error) {
 
     // return empty array directly
     var oldPos = pos
-    try := trimWhiteSpaces(json[1:])
-    if try[0] == ']' {
+    trimmed := trimWhiteSpaces(json[1:])
+    if trimmed[0] == ']' {
         pos.col++
-        return arr, try[1:], nil
+        return arr, trimmed[1:], nil
     }
     // recover
     pos = oldPos
@@ -226,10 +235,10 @@ func parseTru(json []byte) (bol *Jzon, rem []byte, err error) {
         bol.bol = true
         pos.col += 4
         return bol, json[4:], nil
-    } else {
-        err = expectString("true", json[0:4])
-        return
     }
+
+    err = expectString("true", json[0:4])
+    return
 }
 
 func parseFls(json []byte) (bol *Jzon, rem []byte, err error) {
@@ -238,10 +247,10 @@ func parseFls(json []byte) (bol *Jzon, rem []byte, err error) {
         bol.bol = false
         pos.col += 5
         return bol, json[5:], nil
-    } else {
-        err = expectString("false", json[0:5])
-        return
     }
+
+    err = expectString("false", json[0:5])
+    return
 }
 
 func parseNul(json []byte) (nul *Jzon, rem []byte, err error) {
@@ -249,10 +258,10 @@ func parseNul(json []byte) (nul *Jzon, rem []byte, err error) {
     if string(json[0:4]) == "null" {
         pos.col += 4
         return nul, json[4:], nil
-    } else {
-        err = expectString("null", json[0:4])
-        return
     }
+
+    err = expectString("null", json[0:4])
+    return
 }
 
 func parseKVPair(json []byte) (k string, v *Jzon, rem []byte, err error) {
@@ -290,18 +299,18 @@ func parseKey(json []byte) (k string, rem []byte, err error) {
     pos.col++
     rem = json[1:]
 
-    if rem[0] == '"' {
-        pos.col += 1
-        return "", rem[1:], nil
-    }
-
     for {
         switch {
+        case rem[0] == '"':
+            pos.col += 1
+            rem = rem[1:]
+            goto End
+
         case rem[0] != '\\' && rem[1] == '"':
             parsed = append(parsed, rem[0])
             pos.col += 2
             rem = rem[2:]
-            break
+            goto End
 
         case rem[0] == '\\' && rem[1] == 'u':
             utf8str := make([]byte, 0, SHORT_STRING_OPTIMIZED_CAP)
@@ -325,10 +334,9 @@ func parseKey(json []byte) (k string, rem []byte, err error) {
             rem = rem[1:]
             continue
         }
-
-        break
     }
 
+End:
     return string(parsed), rem, nil
 }
 
@@ -429,20 +437,22 @@ func parseUnicode(json []byte) (parsed []byte, rem []byte, err error) {
 
 func parseHex4(json []byte) (hex uint32, rem []byte, err error) {
     rem = json
-    for i := 0; i < 4; i++ {
+    for i := uint32(0); i < 4; i++ {
+        hc := uint32(0)
+        ex := uint32(0x1000 >> (i*4))
         switch {
         case '0' <= rem[i] && rem[i] <= '9':
-            hex += uint32(rem[i] - '0')
+            hc = uint32(rem[i] - '0')
         case 'A' <= rem[i] && rem[i] <= 'F':
-            hex += uint32(10 + rem[i] - 'A')
+            hc = uint32(10 + rem[i] - 'A')
         case 'a' <= rem[i] && rem[i] <= 'f':
-            hex += uint32(10 + rem[i] - 'a')
+            hc = uint32(10 + rem[i] - 'a')
         default:
             err = expectOneOf("0123456789ABCDEF", rem[i])
             return
         }
 
-        hex = hex << 4
+        hex += hc * ex
         pos.col += 1
     }
 

@@ -43,9 +43,8 @@ func (jz *Jzon) Print(reader io.Reader) {
 	// TODO:
 }
 
-// Colored prints colored and formatted JSON text on terminal.
-// if it's not a terminal or doesn't support colors,
-// it just prints raw but formatted text
-func (jz *Jzon) Colored(file os.File) {
+// Coloring prints colored and formatted JSON text on the terminal. if it's not
+// a terminal or doesn't support colors, it just prints raw but formatted text
+func (jz *Jzon) Coloring(file os.File) {
 	// TODO:
 }
