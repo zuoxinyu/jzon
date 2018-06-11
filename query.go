@@ -51,7 +51,7 @@ func (jz *Jzon) Query(path string) (g *Jzon, err error) {
 			err = fmt.Errorf("maybe out of bound: %v", e)
 		}
 	}()
-	return parsePath(jz, []byte(path))
+	return parsePath(jz, append([]byte(path), ';'))
 }
 
 // Search determines whether there exists the node on the given path
@@ -74,9 +74,7 @@ func parsePath(root *Jzon, path []byte) (curr *Jzon, err error) {
 	var isDigit = func(b byte) bool {
 		return '0' >= b && b <= '9'
 	}
-	var isIdentifier = func(b byte) bool {
-		return strings.Contains("ABCDEFGHIJKLMNOPQRSTUVWXYzabcdefghijklmnopqrstuvwxyz01234567890_-", string(b))
-	}
+
 	var st = _Start
 	var ex = []state{_Dollar}
 	var key string
@@ -99,18 +97,6 @@ func parsePath(root *Jzon, path []byte) (curr *Jzon, err error) {
 			path = path[1:]
 			st = _Dot
 			ex = []state{_Key}
-
-		case isIdentifier(path[0]) && st.match(_Dot):
-			key, path, err = parsePathKey(path)
-			if err != nil {
-				return
-			}
-			curr, err = curr.ValueOf(key)
-			if err != nil {
-				return
-			}
-			st = _Key
-			ex = []state{_Dot, _LeftSB, _Comma}
 
 		case path[0] == '[' && st.match(_Dollar, _Key):
 			path = path[1:]
@@ -137,18 +123,31 @@ func parsePath(root *Jzon, path []byte) (curr *Jzon, err error) {
 			st = _RightSB
 			ex = []state{_Dot, _Comma}
 
+		case st.match(_Dot):
+			key, path, err = parsePathKey(path)
+			if err != nil {
+				return
+			}
+			curr, err = curr.ValueOf(key)
+			if err != nil {
+				return
+			}
+			st = _Key
+			ex = []state{_Dot, _LeftSB, _Comma}
+
 		default:
 			return nil, expectState(st, ex)
 		}
 	}
-	return
 }
 
-func parsePathKey(json []byte) (k string, rem []byte, err error) {
+// parsePathKey parses as `parseKey()`, except that the given string
+// isn't surrounded with ", and it will escape some more characters
+func parsePathKey(path []byte) (k string, rem []byte, err error) {
 	var parsed = make([]byte, 0, SHORT_STRING_OPTIMIZED_CAP)
 	var c byte
 
-	rem = json
+	rem = path
 
 	for {
 		switch {
@@ -158,6 +157,26 @@ func parsePathKey(json []byte) (k string, rem []byte, err error) {
 			for _, c := range utf8str {
 				parsed = append(parsed, c)
 			}
+			continue
+
+		case rem[0] == '\\' && rem[1] == '.':
+			parsed = append(parsed, '.')
+			rem = rem[2:]
+			continue
+
+		case rem[0] == '\\' && rem[1] == '[':
+			parsed = append(parsed, '[')
+			rem = rem[2:]
+			continue
+
+		case rem[0] == '\\' && rem[1] == ']':
+			parsed = append(parsed, ']')
+			rem = rem[2:]
+			continue
+
+		case rem[0] == '\\' && rem[1] == ';':
+			parsed = append(parsed, ';')
+			rem = rem[2:]
 			continue
 
 		case rem[0] == '\\' && rem[1] != 'u':

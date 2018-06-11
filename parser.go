@@ -207,7 +207,6 @@ func parseStr(json []byte) (str *Jzon, rem []byte, err error) {
 
 func parseNum(json []byte) (num *Jzon, rem []byte, err error) {
 	num = New(JzTypeNum)
-	var digits = "0123456789"
 
 	if json[0] == '-' {
 		var neg = New(JzTypeNum)
@@ -221,7 +220,7 @@ func parseNum(json []byte) (num *Jzon, rem []byte, err error) {
 	var n int64
 	_, err = fmt.Sscanf(string(json), "%d", &n)
 	if err != nil {
-		err = expectOneOf(digits, json[0])
+		err = expectOneOf("0123456789", json[0])
 		return
 	}
 
@@ -441,15 +440,10 @@ func parseHex4(json []byte) (hex uint32, rem []byte, err error) {
 		hc := uint32(0)
 		ex := uint32(0x1000 >> (i * 4))
 		switch {
-		case '0' <= rem[i] && rem[i] <= '9':
-			hc = uint32(rem[i] - '0')
-		case 'A' <= rem[i] && rem[i] <= 'F':
-			hc = uint32(10 + rem[i] - 'A')
-		case 'a' <= rem[i] && rem[i] <= 'f':
-			hc = uint32(10 + rem[i] - 'a')
-		default:
-			err = expectOneOf("0123456789ABCDEF", rem[i])
-			return
+		case '0' <= rem[i] && rem[i] <= '9': hc = uint32(0  + rem[i] - '0')
+		case 'A' <= rem[i] && rem[i] <= 'F': hc = uint32(10 + rem[i] - 'A')
+		case 'a' <= rem[i] && rem[i] <= 'f': hc = uint32(10 + rem[i] - 'a')
+		default: return hex, nil, expectOneOf("0123456789ABCDEF", rem[i])
 		}
 
 		hex += hc * ex
