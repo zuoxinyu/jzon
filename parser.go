@@ -23,7 +23,7 @@ var pos position
 const SHORT_STRING_OPTIMIZED_CAP = 16
 
 // firstByteMarkMap is the first-byte-mark table in UTF-8 encoding
-var firstByteMarkMap = [...]uint32{0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC}
+var firstByteMarkMap = [...]uint32{0x00, 0x00, 0xC0, 0xE0, 0xF0}
 
 // escapeMap is for fast converting escape-able characters
 var escapeMap = map[byte]byte{
@@ -356,6 +356,13 @@ func parseEscaped(json []byte) (escaped byte, rem []byte, err error) {
 }
 
 func parseUnicode(json []byte) (parsed []byte, rem []byte, err error) {
+    // a valid UTF-8 code point is consisted of n bytes (1 < n < 5):
+    // a leading byte begins with n * 1 and n-1 bytes begin with 10
+    // 0000 0000 - 0000 007F | 0xxxxxxx
+    // 0000 0080 - 0000 07FF | 110xxxxx 10xxxxxx
+    // 0000 0800 - 0000 FFFF | 1110xxxx 10xxxxxx 10xxxxxx
+    // 0001 0000 - 0010 FFFF | 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+
 	var uc, uc2 uint32
 	var isInvalidCodePoint = func(cp uint32) bool {
 		return 0xDC00 <= cp && cp <= 0xDFFF || cp == 0
@@ -393,38 +400,29 @@ func parseUnicode(json []byte) (parsed []byte, rem []byte, err error) {
 			return
 		}
 
-		uc = 0x10000 + ((uc&0x3FF)<<10 | uc2&0x3FF)
+		uc = 0x10000 + (((uc & 0x3FF) << 10 | uc2) & 0x3FF)
 	}
 
 	var nBytes int
 	switch {
-	case uc < 0x80:
-		nBytes = 1
-	case uc < 0x800:
-		nBytes = 2
-	case uc < 0x10000:
-		nBytes = 3
-	default:
-		nBytes = 4
+	case uc < 0x80:    nBytes = 1
+	case uc < 0x800:   nBytes = 2
+	case uc < 0x10000: nBytes = 3
+	default:           nBytes = 4
 	}
 
 	parsed = []byte{0, 0, 0, 0}
 
+	// `c | 0x80` : set the 8th bit (0th from the lowest bit) to 1
+	// `c & 0xBF` : reserve the 8th bit, and get the lower 6 bits
+	// `c >> 0x6` : erase the lower 6 bits for the next one step
+	// `c | firstByteMarkMap[n]`:set the highest n-1 bytes to 1
+
 	switch nBytes {
-	case 4:
-		parsed[3] = byte(uc | 0x80&0xBF)
-		uc >>= 6
-		fallthrough
-	case 3:
-		parsed[2] = byte(uc | 0x80&0xBF)
-		uc >>= 6
-		fallthrough
-	case 2:
-		parsed[1] = byte(uc | 0x80&0xBF)
-		uc >>= 6
-		fallthrough
-	case 1:
-		parsed[0] = byte(uc | firstByteMarkMap[nBytes])
+	case 4: parsed[3] = byte((uc | 0x80) & 0xBF); uc >>= 6; fallthrough
+	case 3: parsed[2] = byte((uc | 0x80) & 0xBF); uc >>= 6; fallthrough
+	case 2: parsed[1] = byte((uc | 0x80) & 0xBF); uc >>= 6; fallthrough
+	case 1: parsed[0] = byte( uc | firstByteMarkMap[nBytes])
 	}
 
 	var realParsed []byte
