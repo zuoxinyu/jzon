@@ -2,7 +2,8 @@ package jzon
 
 import (
 	"errors"
-    "fmt"
+	"fmt"
+	"reflect"
 )
 
 type ValueType int
@@ -37,7 +38,7 @@ var typeStrings = []string{
 	"JzTypeNul",
 }
 
-// New allocates a Jzon node on the heap
+// New allocates an empty Jzon node on the heap
 func New(t ValueType) *Jzon {
 	v := Jzon{}
 	v.Type = t
@@ -55,17 +56,72 @@ func New(t ValueType) *Jzon {
 	return &v
 }
 
+// NewFromAny allocates and assigns a Jzon node on the heap, if the given `v` is of type
+// `*Jzon`, it performs as deep clone, if `v` is of type `Jzon`, it performs as shallow
+// clone, otherwise it converts value of built-in types to an appropriate `Jzon` value
+func NewFromAny(v Any) *Jzon {
+	jz := Jzon{}
+
+	if v == nil {
+		jz.Type = JzTypeNul
+		return &jz
+	}
+
+	switch v.(type) {
+	case int, int16, int32, int64, uint, uint16, uint32:
+		jz.Type = JzTypeNum
+		jz.num = reflect.ValueOf(v).Int()
+
+	case float32, float64:
+		jz.Type = JzTypeNum
+		jz.flt = reflect.ValueOf(v).Float()
+
+	case string:
+		jz.Type = JzTypeStr
+		jz.str = v.(string)
+
+	case []byte:
+		jz.Type = JzTypeStr
+		jz.str = string(v.([]byte))
+
+	case bool:
+		jz.Type = JzTypeBol
+		jz.bol = v.(bool)
+
+	case []*Jzon:
+		jz.Type = JzTypeArr
+		jz.arr = v.([]*Jzon)
+
+	case map[string]*Jzon:
+		jz.Type = JzTypeObj
+		jz.obj = v.(map[string]*Jzon)
+
+	case *Jzon:
+		// TODO: deep clone
+		jz = *(v.(*Jzon))
+
+	case Jzon:
+		// TODO: shallow clone
+		jz = v.(Jzon)
+
+	default:
+		return nil
+	}
+
+	return &jz
+}
+
 // Parse parses string to Jzon, any errors occurred in the parsing will be thrown out
 func Parse(json []byte) (jz *Jzon, err error) {
-    // in the implements of function `parse()` we don't handle any
-    // exceptions about slice bounds out of range. here we simply
-    // throw the error recovered from those unhandled exceptions
-    defer func() {
-        e := recover()
-        if e != nil {
-            err = fmt.Errorf("maybe out of bound: %v", e)
-        }
-    }()
+	// in the implements of function `parse()` we don't handle any
+	// exceptions about slice bounds out of range. here we simply
+	// throw the error recovered from those unhandled exceptions
+	defer func() {
+		e := recover()
+		if e != nil {
+			err = fmt.Errorf("maybe out of bound: %v", e)
+		}
+	}()
 
 	pos.col = 0
 	pos.row = 0
@@ -73,40 +129,13 @@ func Parse(json []byte) (jz *Jzon, err error) {
 	return jz, err
 }
 
-// Number returns number value, if it's not a number, an error will be thrown out
-func (jz *Jzon) Number() (n int64, err error) {
-	if jz.Type != JzTypeNum {
-		return n, expectTypeOf(JzTypeNum, jz.Type)
+// Object returns object value, if it's not an object, an error will be thrown out
+func (jz *Jzon) Object() (m map[string]*Jzon, err error) {
+	if jz.Type != JzTypeObj {
+		return m, expectTypeOf(JzTypeObj, jz.Type)
 	}
 
-	return jz.num, nil
-}
-
-// String returns string value, if it's not a string, an error will be thrown out
-func (jz *Jzon) String() (s string, err error) {
-	if jz.Type != JzTypeStr {
-		return s, expectTypeOf(JzTypeStr, jz.Type)
-	}
-
-	return jz.str, nil
-}
-
-// Bool returns bool value, if it's not a boolean, an error will be thrown out
-func (jz *Jzon) Bool() (b bool, err error) {
-	if jz.Type != JzTypeBol {
-		return b, expectTypeOf(JzTypeBol, jz.Type)
-	}
-
-	return jz.bol, nil
-}
-
-// Null returns nil value, if it's not a boolean, an error will be thrown out
-func (jz *Jzon) Null() (n Any, err error) {
-	if jz.Type != JzTypeNul {
-		return nil, expectTypeOf(JzTypeNul, jz.Type)
-	}
-
-	return nil, nil
+	return jz.obj, nil
 }
 
 // Array returns array value, if it's not an array, an error will be thrown out
@@ -118,13 +147,55 @@ func (jz *Jzon) Array() (a []*Jzon, err error) {
 	return jz.arr, nil
 }
 
-// Object returns object value, if it's not an object, an error will be thrown out
-func (jz *Jzon) Object() (m map[string]*Jzon, err error) {
-	if jz.Type != JzTypeObj {
-		return m, expectTypeOf(JzTypeObj, jz.Type)
+// String returns string value, if it's not a string, an error will be thrown out
+func (jz *Jzon) String() (s string, err error) {
+	if jz.Type != JzTypeStr {
+		return s, expectTypeOf(JzTypeStr, jz.Type)
 	}
 
-	return jz.obj, nil
+	return jz.str, nil
+}
+
+// Number returns number value, if it's not a number, an error will be thrown out
+func (jz *Jzon) Number() (n int64, err error) {
+	if jz.Type != JzTypeNum {
+		return n, expectTypeOf(JzTypeNum, jz.Type)
+	}
+
+	return jz.num, nil
+}
+
+// Null returns nil value, if it's not a boolean, an error will be thrown out
+func (jz *Jzon) Null() (n Any, err error) {
+	if jz.Type != JzTypeNul {
+		return nil, expectTypeOf(JzTypeNul, jz.Type)
+	}
+
+	return nil, nil
+}
+
+// Bool returns bool value, if it's not a null, an error will be thrown out
+func (jz *Jzon) Bool() (b bool, err error) {
+	if jz.Type != JzTypeBol {
+		return b, expectTypeOf(JzTypeBol, jz.Type)
+	}
+
+	return jz.bol, nil
+}
+
+// Length returns the length of an object or an array, if it is an object,
+// just returns the number of keys, otherwise an error will be thrown out
+func (jz *Jzon) Length() (l int, err error) {
+	if jz.Type == JzTypeArr {
+		return len(jz.arr), nil
+	}
+
+	if jz.Type == JzTypeObj {
+		return len(jz.obj), nil
+	}
+
+	return -1, errors.New("expect node of type JzTypeArr or JzTypeObj" +
+		", but the real type is " + typeStrings[jz.Type])
 }
 
 // ValueOf finds the value of the key in an object, if it's not an object
@@ -158,17 +229,6 @@ func (jz *Jzon) ValueAt(i int) (v *Jzon, err error) {
 	return jz.arr[i], nil
 }
 
-// Has returns if this object has the given key, if
-// it's not an object, an error will be thrown out
-func (jz *Jzon) Has(k string) (has bool, err error) {
-	if jz.Type != JzTypeObj {
-		return has, expectTypeOf(JzTypeArr, jz.Type)
-	}
-
-	_, ok := jz.obj[k]
-	return ok, nil
-}
-
 // Keys returns all keys as an string slice in object,
 // if it's not an object, an error will be thrown out
 func (jz *Jzon) Keys() (ks []string, err error) {
@@ -183,19 +243,15 @@ func (jz *Jzon) Keys() (ks []string, err error) {
 	return ks, nil
 }
 
-// Length returns the length of an object or an array, if it is an object,
-// just returns the number of keys, otherwise an error will be thrown out
-func (jz *Jzon) Length() (l int, err error) {
-	if jz.Type == JzTypeArr {
-		return len(jz.arr), nil
+// Has returns if this object has the given key, if
+// it's not an object, an error will be thrown out
+func (jz *Jzon) Has(k string) (has bool, err error) {
+	if jz.Type != JzTypeObj {
+		return has, expectTypeOf(JzTypeArr, jz.Type)
 	}
 
-	if jz.Type == JzTypeObj {
-		return len(jz.obj), nil
-	}
-
-	return -1, errors.New("expect node of type JzTypeArr or JzTypeObj" +
-		", but the real type is " + typeStrings[jz.Type])
+	_, ok := jz.obj[k]
+	return ok, nil
 }
 
 // IsNull returns whether it equals to null
@@ -291,9 +347,9 @@ func (jz *Jzon) AFilter(predictFunc func(g *Jzon) bool) (res []*Jzon, err error)
 
 // AReduce is just reduce for array, if it's not an object, an error will be thrown out
 func (jz *Jzon) AReduce(init Any, acc func(a *Jzon, b Any) Any) (res Any, err error) {
-    if jz.Type != JzTypeArr {
-        return res, expectTypeOf(JzTypeArr, jz.Type)
-    }
+	if jz.Type != JzTypeArr {
+		return res, expectTypeOf(JzTypeArr, jz.Type)
+	}
 
 	res = init
 
@@ -321,9 +377,9 @@ func (jz *Jzon) OMap(itFunc func(key string, g *Jzon) Any) (res []Any, err error
 
 // OFilter is just filter for object, if it's not an object, an error will be thrown out
 func (jz *Jzon) OFilter(predictFunc func(key string, value *Jzon) bool) (res *Jzon, err error) {
-    if jz.Type != JzTypeObj{
-        return res, expectTypeOf(JzTypeObj, jz.Type)
-    }
+	if jz.Type != JzTypeObj {
+		return res, expectTypeOf(JzTypeObj, jz.Type)
+	}
 
 	var tmp Jzon = *jz
 
@@ -337,7 +393,7 @@ func (jz *Jzon) OFilter(predictFunc func(key string, value *Jzon) bool) (res *Jz
 	return res, nil
 }
 
-// Map is just flat map which retrieves on each children node of itself
+// Map is flat map which retrieves on each children node of itself
 func (jz *Jzon) Map(mapFunc func(string, *Jzon) Any) (res Any, err error) {
 	switch jz.Type {
 	case JzTypeArr:
