@@ -56,7 +56,7 @@ func (jz *Jzon) Query(path string) (g *Jzon, err error) {
 
 // Search determines whether there exists the node on the given path
 func (jz *Jzon) Search(path string) (exists bool) {
-	found, _ := parsePath(jz, []byte(path))
+	found, _ := jz.Query(path)
 	return found != nil
 }
 
@@ -72,7 +72,7 @@ func expectState(real state, ex []state) error {
 
 func parsePath(root *Jzon, path []byte) (curr *Jzon, err error) {
 	var isDigit = func(b byte) bool {
-		return '0' >= b && b <= '9'
+		return '0' <= b && b <= '9'
 	}
 
 	var st = _Start

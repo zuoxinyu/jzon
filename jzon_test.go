@@ -4,6 +4,46 @@ import (
 	"testing"
 )
 
+const deepJson = `{
+	"key-object": {
+		"key-o-o": {
+			"number": 1234,
+			"string": "a string"
+		}
+	},
+	"key-array": [
+		{
+			"number": 4567,
+			"string": "another string 1",
+			"null": null,
+			"bool": false,
+			"empty-object": {
+
+			}
+		},
+		{
+			"number": 4567,
+			"string": "another string 2",
+			"null": null,
+			"bool": false,
+			"empty-object": {
+
+			}
+		},
+		{
+			"number": 4567,
+			"string": "another string 3",
+			"null": null,
+			"bool": false,
+			"empty-object": {
+
+			}
+		}
+	],
+	"key-汉字": "值也是汉字",
+	"key-escaped-.[];-key": "escape success"
+}`
+
 // parser.go
 
 func TestParse(t *testing.T) {
@@ -209,46 +249,6 @@ func TestParseHex4(t *testing.T) {
 // query.go
 
 func TestQuery(t *testing.T) {
-	const deepJson = `{
-		"key-object": {
-			"key-o-o": {
-				"number": 1234,
-				"string": "a string"
-			}
-		},
-		"key-array": [
-			{
-				"number": 4567,
-				"string": "another string 1",
-				"null": null,
-				"bool": false,
-				"empty-object": {
-
-				}
-			},
-			{
-				"number": 4567,
-				"string": "another string 2",
-				"null": null,
-				"bool": false,
-				"empty-object": {
-
-				}
-			},
-			{
-				"number": 4567,
-				"string": "another string 3",
-				"null": null,
-				"bool": false,
-				"empty-object": {
-
-				}
-			}
-		],
-		"key-汉字": "值也是汉字",
-		"key-escaped-.[];-key": "escape success"
-	}`
-
 	var res *Jzon
 	var num int64
 	var str string
@@ -309,4 +309,18 @@ func TestQuery(t *testing.T) {
 	if str != "escape success" {
 		t.Errorf("expect str = escape success, but str is %v", str)
 	}
+}
+
+func TestSearch(t *testing.T) {
+	jz, err := Parse([]byte(deepJson))
+	if err != nil {
+		t.Error(err)
+	}
+
+	ok := jz.Search(`$.key-escaped-\.\[\]\;-key`)
+
+	if !ok {
+		t.Errorf("expect ok = true")
+	}
+
 }
