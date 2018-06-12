@@ -23,6 +23,7 @@ type Jzon struct {
 const (
 	JzTypeStr ValueType = iota
 	JzTypeNum
+	JzTypeFlt
 	JzTypeBol
 	JzTypeObj
 	JzTypeArr
@@ -31,6 +32,7 @@ const (
 
 var typeStrings = []string{
 	"JzTypeStr",
+	"JzTypeFlt",
 	"JzTypeNum",
 	"JzTypeBol",
 	"JzTypeObj",

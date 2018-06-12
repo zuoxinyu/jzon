@@ -322,5 +322,4 @@ func TestSearch(t *testing.T) {
 	if !ok {
 		t.Errorf("expect ok = true")
 	}
-
 }

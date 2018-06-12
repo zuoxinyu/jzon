@@ -207,6 +207,41 @@ func parseStr(json []byte) (str *Jzon, rem []byte, err error) {
 
 func parseNum(json []byte) (num *Jzon, rem []byte, err error) {
 	num = New(JzTypeNum)
+	var n int64
+	var f float64
+    type state uint64
+	const (
+	    _Start state = 2 << iota
+	    _Zero                    // 0
+	    _Dot                     // .
+	    _Digit                   // 0-9
+	    _NoneZero                // 1-9
+	    _Exp                     // e E
+	    _Plus                    // +
+        _Minus                   // -
+	    _End
+    )
+
+	var st = _Start
+	var pst = &st
+	var ex = []state{_Zero, _Digit}
+
+	var match = func(ex ... state) bool {
+	    for _, s := range ex {
+	        if uint64(*pst) | uint64(s) > 0 {
+	            return true
+            }
+        }
+        return false
+    }
+
+    var isNoneZero = func(b byte) bool {
+        return '0' <= b && b <= '9'
+    }
+
+    var isDigit = func(b byte) bool {
+        return '1' <= b && b <= '9'
+    }
 
 	if json[0] == '-' {
 		var neg = New(JzTypeNum)
@@ -217,17 +252,52 @@ func parseNum(json []byte) (num *Jzon, rem []byte, err error) {
 		return neg, rem, err
 	}
 
-	var n int64
-	_, err = fmt.Sscanf(string(json), "%d", &n)
-	if err != nil {
-		err = expectOneOf("0123456789", json[0])
+	if json[0] == '0' && json[1] != '.' {
+		err = expect('.', json[1])
 		return
 	}
 
-	nparsed := len(strconv.FormatInt(n, 10))
+	rem = json
+
+	for {
+		switch {
+		case rem[0] == '0' && match(_Start):
+		    ex = []state{_Dot}
+		    st = _Zero
+
+        case isNoneZero(rem[0]) && match(_Start):
+            ex = []state{_Dot, _Digit}
+            st = _NoneZero
+
+        case rem[0] == '.' && match(_Zero, _Digit, _NoneZero):
+            ex = []state{_Digit}
+            st = _Dot
+
+        case isDigit(rem[0]) && match(_Digit, _NoneZero):
+            ex = []state{_Digit, _Exp, _Dot, _End}
+            st = _Digit
+
+        case isDigit(rem[0]) && match(_Dot):
+
+        case rem[0] == 'e' && match(_Digit):
+
+        case isDigit(rem[0]) && match(_Exp, _Plus, _Minus):
+
+
+		}
+	}
+
+
+	_, err = fmt.Sscanf(string(json), "%d", &n)
+	if err != nil {
+		err = expectOneOf("0123456789.e+-", json[0])
+		return
+	}
+
+	nParsed := len(strconv.FormatInt(n, 10))
 	num.num = n
-	pos.col += nparsed
-	return num, json[nparsed:], nil
+	pos.col += nParsed
+	return num, json[nParsed:], nil
 }
 
 func parseTru(json []byte) (bol *Jzon, rem []byte, err error) {
