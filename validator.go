@@ -6,15 +6,6 @@ import (
     "strings"
 )
 
-const sample = `
-{
-    "str": "regexp: 0 /*/"
-    "num": "range: 2 100-200 | -1+2 | 1,2,3"
-    "bol": "bool: 1 true|false"
-    "nul": "null: 2 null"
-}
-`
-
 const (
     COND_REGEXP = "regexp:"
     COND_RANGE  = "range:"
@@ -70,6 +61,16 @@ func (rng *Range) CanAccept(n int64) bool {
     return false
 }
 
+/*
+sample:
+{
+    "str": "regexp: 0 *"
+    "num": "range: 2 100-200 | -1+2 | 1,2,3"
+    "bol": "bool: 1 true|false"
+    "nul": "null: 2 null"
+}
+*/
+
 func compileCondition(cond string) (fn Validator, err error) {
     switch {
     case strings.HasPrefix(cond, COND_REGEXP) :
@@ -102,7 +103,6 @@ func compileRegExp(cond string) (fn Validator, err error) {
         }
         return reg.Match([]byte(str))
     }, nil
-
 }
 
 func compileRange(cond string) (fn Validator, err error) {
@@ -119,7 +119,7 @@ func compileRange(cond string) (fn Validator, err error) {
 
     return func(jz *Jzon) bool {
         var n int64
-        if n, err = jz.Number(); err != nil {
+        if n, err = jz.Integer(); err != nil {
             return false
         }
         return rng.CanAccept(n)
@@ -168,4 +168,3 @@ func (jz *Jzon) Validate(validator *Jzon) (ok bool, report *Jzon, err error) {
     // TODO:
     return
 }
-

@@ -2,41 +2,44 @@ package jzon
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 )
 
+// state indicates the inner state of the `parsePath` state machine
 type state int64
 
 const (
-	_Start state = 2 << iota
-	_Dollar
-	_Dot
-	_LeftSB
-	_RightSB
-	_Key
-	_Index
-	_Comma
+	// $.key1[1].big-array[1:4]
+	_Start     state = 2 << iota
+	_Dollar          // $        root
+	_Dot             // .        key mark
+	_LeftSB          // [        index mark
+	_RightSB         // ]        index end
+	_Key             // .*       object key
+	_Index           // [1-9]\d+ array index
+	_Colon           // :        slice mark
+	_Semicolon       // ;        line tail
 )
 
 var stateStrings = map[state]string{
-	_Start:   "_Start",
-	_Dollar:  "_Dollar",
-	_Dot:     "_Dot",
-	_LeftSB:  "_LeftSB",
-	_RightSB: "_RightSB",
-	_Key:     "_Key",
-	_Index:   "_Index",
-	_Comma:   "_Comma",
+	_Start:     "_Start",
+	_Dollar:    "_Dollar",
+	_Dot:       "_Dot",
+	_LeftSB:    "_LeftSB",
+	_RightSB:   "_RightSB",
+	_Key:       "_Key",
+	_Index:     "_Index",
+	_Colon:     "_Colon",
+	_Semicolon: "_Semicolon",
 }
 
 func (st state) match(states ...state) bool {
-	var final int64 = 0
 	for _, s := range states {
-		final = int64(s) | final
+		if uint64(st)&uint64(s) > 0 {
+			return true
+		}
 	}
-
-	return (int64(st) & final) > 0
+	return false
 }
 
 // Query searches a child node in an object or an array, if the
@@ -71,10 +74,6 @@ func expectState(real state, ex []state) error {
 }
 
 func parsePath(root *Jzon, path []byte) (curr *Jzon, err error) {
-	var isDigit = func(b byte) bool {
-		return '0' <= b && b <= '9'
-	}
-
 	var st = _Start
 	var ex = []state{_Dollar}
 	var key string
@@ -83,47 +82,62 @@ func parsePath(root *Jzon, path []byte) (curr *Jzon, err error) {
 	for {
 		switch {
 		case path[0] == '$' && st.match(_Start):
-			curr = root
-			path = path[1:]
-			st = _Dollar
-			ex = []state{_Dot, _LeftSB, _Comma}
+			ex = []state{_Dot, _LeftSB, _Semicolon}
+            st = _Dollar
+
+            curr = root
+            path = path[1:]
 
 		case path[0] == ';' && st.match(_Dollar, _RightSB, _Key):
-			st = _Comma
 			ex = []state{}
+            st = _Semicolon
+
 			return
 
 		case path[0] == '.' && st.match(_Dollar, _Key, _RightSB):
-			path = path[1:]
-			st = _Dot
 			ex = []state{_Key}
+            st = _Dot
+
+            path = path[1:]
 
 		case path[0] == '[' && st.match(_Dollar, _Key):
-			path = path[1:]
-			st = _LeftSB
 			ex = []state{_Index}
+            st = _LeftSB
+
+            path = path[1:]
 
 		case isDigit(path[0]) && st.match(_LeftSB):
-			var idx int
-			_, err = fmt.Sscanf(string(path), "%d", &idx)
+            ex = []state{_RightSB}
+            st = _Index
+
+            var n int64
+            var f float64
+            var isInt bool
+            n, f, isInt, path, err = parseNumeric(path)
+            if err != nil {
+                return
+            }
+
+            if !isInt {
+                err = fmt.Errorf("expect an integer index, but found float: %v", f)
+                return
+            }
+
+			curr, err = curr.ValueAt(int(n))
 			if err != nil {
 				return
 			}
-			nBytes := len(strconv.Itoa(idx))
-			curr, err = curr.ValueAt(idx)
-			if err != nil {
-				return
-			}
-			path = path[nBytes:]
-			st = _Index
-			ex = []state{_RightSB}
 
 		case path[0] == ']' && st.match(_Index):
+            ex = []state{_Dot, _Semicolon}
+            st = _RightSB
+
 			path = path[1:]
-			st = _RightSB
-			ex = []state{_Dot, _Comma}
 
 		case st.match(_Dot):
+            ex = []state{_Dot, _LeftSB, _Semicolon}
+            st = _Key
+
 			key, path, err = parsePathKey(path)
 			if err != nil {
 				return
@@ -132,8 +146,6 @@ func parsePath(root *Jzon, path []byte) (curr *Jzon, err error) {
 			if err != nil {
 				return
 			}
-			st = _Key
-			ex = []state{_Dot, _LeftSB, _Comma}
 
 		default:
 			return nil, expectState(st, ex)

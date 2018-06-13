@@ -2,6 +2,8 @@ package jzon
 
 import (
 	"testing"
+	"fmt"
+    "io/ioutil"
 )
 
 const deepJson = `{
@@ -62,6 +64,31 @@ func TestParse(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
+	content, err := ioutil.ReadFile("../data/twitter.json")
+    if err != nil {
+        t.Error(err)
+    }
+	_, err = Parse(content)
+	if err != nil {
+	    t.Error(err)
+    }
+    content, err = ioutil.ReadFile("../data/getInfo.json")
+    if err != nil {
+        t.Error(err)
+    }
+	_, err = Parse(content)
+	if err != nil {
+	    t.Error(err)
+    }
+    content, err = ioutil.ReadFile("../data/loginInfo.json")
+    if err != nil {
+        t.Error(err)
+    }
+	_, err = Parse(content)
+	if err != nil {
+	    t.Error(err)
+    }
 }
 
 func TestParseObj(t *testing.T) {
@@ -121,7 +148,7 @@ func TestParseNum(t *testing.T) {
 		t.Error(err)
 	}
 
-	num, _ := n.Number()
+	num, _ := n.Integer()
 
 	if num != 1234 {
 		t.Errorf("expect num = 1234, but num is %d", num)
@@ -246,6 +273,86 @@ func TestParseHex4(t *testing.T) {
 	}
 }
 
+func TestParseNumeric(t *testing.T) {
+	var integer = []byte("1234")
+	var float   = []byte("12.34")
+	var frac    = []byte("1.2E+04")
+	var zero    = []byte("0")
+	var neg     = []byte("-12")
+	var more    = []byte("123.4f")
+
+	var n int64
+	var f float64
+	var err error
+	var isInt bool
+	var rem []byte
+
+	n, f, isInt, rem, err = parseNumeric(integer)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Printf("n = %5d, f = %5.2f\t, isInt = %v\t, rem = \"%8s\", err = %v\n", n, f, isInt, string(rem), err)
+
+	if n == 0 {
+		t.Errorf("expect n = 1234, but n = %d", n)
+	}
+
+	n, f, isInt, rem, err = parseNumeric(float)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Printf("n = %5d, f = %5.2f\t, isInt = %v\t, rem = \"%8s\", err = %v\n", n, f, isInt, string(rem), err)
+	if f - 12.34 >= 0.00001 {
+		t.Errorf("expect f = 12.34, but f = %f", f)
+	}
+
+
+	n, f, isInt, rem, err = parseNumeric(frac)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Printf("n = %5d, f = %5.2f\t, isInt = %v\t, rem = \"%8s\", err = %v\n", n, f, isInt, string(rem), err)
+	if f - 12000.0 >= 0.01 {
+		t.Errorf("expect f = 12000 but f = %f", f)
+	}
+
+	n, f, isInt, rem, err = parseNumeric(zero)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Printf("n = %5d, f = %5.2f\t, isInt = %v\t, rem = \"%8s\", err = %v\n", n, f, isInt, string(rem), err)
+	if n != 0 {
+		t.Errorf("expect n = 0 but n = %d", n)
+	}
+
+	n, f, isInt, rem, err = parseNumeric(neg)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Printf("n = %5d, f = %5.2f\t, isInt = %v\t, rem = \"%8s\", err = %v\n", n, f, isInt, string(rem), err)
+	if n != -12 {
+		t.Errorf("expect n = -12 but n = %d", n)
+	}
+
+	n, f, isInt, rem, err = parseNumeric(more)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Printf("n = %5d, f = %5.2f\t, isInt = %v\t, rem = \"%8s\", err = %v\n", n, f, isInt, string(rem), err)
+	if f - 12000.0 >= 0.01 {
+		t.Errorf("expect f = 12000 but f = %f", f)
+	}
+
+	if isInt {
+		t.Errorf("expect isInt = false, but isInt is %v", isInt)
+	}
+
+	if rem[0] != 'f' {
+		t.Errorf("expect rem[0] = 'f', but rem[0] is %v", rem[0])
+	}
+
+}
+
 // query.go
 
 func TestQuery(t *testing.T) {
@@ -263,7 +370,7 @@ func TestQuery(t *testing.T) {
 		t.Error(err)
 	}
 
-	if num, err = res.Number(); err != nil {
+	if num, err = res.Integer(); err != nil {
 		t.Error(err)
 	}
 
@@ -323,3 +430,4 @@ func TestSearch(t *testing.T) {
 		t.Errorf("expect ok = true")
 	}
 }
+

@@ -1,9 +1,8 @@
 package jzon
 
 import (
-	"errors"
-	"fmt"
-	"reflect"
+    "errors"
+    "fmt"
 )
 
 type ValueType int
@@ -22,7 +21,7 @@ type Jzon struct {
 
 const (
 	JzTypeStr ValueType = iota
-	JzTypeNum
+    JzTypeInt
 	JzTypeFlt
 	JzTypeBol
 	JzTypeObj
@@ -33,7 +32,7 @@ const (
 var typeStrings = []string{
 	"JzTypeStr",
 	"JzTypeFlt",
-	"JzTypeNum",
+	"JzTypeInt",
 	"JzTypeBol",
 	"JzTypeObj",
 	"JzTypeArr",
@@ -46,71 +45,15 @@ func New(t ValueType) *Jzon {
 	v.Type = t
 	switch t {
 	case JzTypeStr:
-	case JzTypeNum:
+	case JzTypeInt:
+    case JzTypeFlt:
 	case JzTypeBol:
-	case JzTypeObj:
-		v.obj = make(map[string]*Jzon)
-	case JzTypeArr:
-		v.arr = make([]*Jzon, 0)
+	case JzTypeObj: v.obj = make(map[string]*Jzon)
+	case JzTypeArr: v.arr = make([]*Jzon, 0)
 	case JzTypeNul:
 	}
 
 	return &v
-}
-
-// NewFromAny allocates and assigns a Jzon node on the heap, if the given `v` is of type
-// `*Jzon`, it performs as deep clone, if `v` is of type `Jzon`, it performs as shallow
-// clone, otherwise it converts value of built-in types to an appropriate `Jzon` value
-func NewFromAny(v Any) *Jzon {
-	jz := Jzon{}
-
-	if v == nil {
-		jz.Type = JzTypeNul
-		return &jz
-	}
-
-	switch v.(type) {
-	case int, int16, int32, int64, uint, uint16, uint32:
-		jz.Type = JzTypeNum
-		jz.num = reflect.ValueOf(v).Int()
-
-	case float32, float64:
-		jz.Type = JzTypeNum
-		jz.flt = reflect.ValueOf(v).Float()
-
-	case string:
-		jz.Type = JzTypeStr
-		jz.str = v.(string)
-
-	case []byte:
-		jz.Type = JzTypeStr
-		jz.str = string(v.([]byte))
-
-	case bool:
-		jz.Type = JzTypeBol
-		jz.bol = v.(bool)
-
-	case []*Jzon:
-		jz.Type = JzTypeArr
-		jz.arr = v.([]*Jzon)
-
-	case map[string]*Jzon:
-		jz.Type = JzTypeObj
-		jz.obj = v.(map[string]*Jzon)
-
-	case *Jzon:
-		// TODO: deep clone
-		jz = *(v.(*Jzon))
-
-	case Jzon:
-		// TODO: shallow clone
-		jz = v.(Jzon)
-
-	default:
-		return nil
-	}
-
-	return &jz
 }
 
 // Parse parses string to Jzon, any errors occurred in the parsing will be thrown out
@@ -158,13 +101,22 @@ func (jz *Jzon) String() (s string, err error) {
 	return jz.str, nil
 }
 
-// Number returns number value, if it's not a number, an error will be thrown out
-func (jz *Jzon) Number() (n int64, err error) {
-	if jz.Type != JzTypeNum {
-		return n, expectTypeOf(JzTypeNum, jz.Type)
+// Integer returns integer value, if it's not an integer, an error will be thrown out
+func (jz *Jzon) Integer() (n int64, err error) {
+	if jz.Type != JzTypeInt {
+		return n, expectTypeOf(JzTypeInt, jz.Type)
 	}
 
 	return jz.num, nil
+}
+
+// Float returns float64 value, if it's not a float, an error will be thrown out
+func (jz *Jzon) Float() (f float64, err error) {
+    if jz.Type != JzTypeFlt {
+        return f, expectTypeOf(JzTypeInt, jz.Type)
+    }
+
+    return jz.flt, nil
 }
 
 // Null returns nil value, if it's not a boolean, an error will be thrown out
@@ -383,7 +335,7 @@ func (jz *Jzon) OFilter(predictFunc func(key string, value *Jzon) bool) (res *Jz
 		return res, expectTypeOf(JzTypeObj, jz.Type)
 	}
 
-	var tmp Jzon = *jz
+	var tmp = *jz
 
 	for k, v := range tmp.obj {
 		if !predictFunc(k, v) {

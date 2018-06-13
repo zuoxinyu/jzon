@@ -72,9 +72,13 @@ func (jz *Jzon) Print() {
         s, _ := jz.String()
         fmt.Printf("\"%s\"", s)
 
-    case JzTypeNum:
-        n, _ := jz.Number()
+    case JzTypeInt:
+        n, _ := jz.Integer()
         fmt.Printf("%d", n)
+
+    case JzTypeFlt:
+        f, _ := jz.Float()
+        fmt.Printf("%f", f)
 
     case JzTypeBol:
         b, _ := jz.Bool()

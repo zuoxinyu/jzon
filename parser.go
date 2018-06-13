@@ -3,8 +3,6 @@ package jzon
 import (
 	"fmt"
 	"runtime"
-	"strconv"
-	"strings"
 )
 
 type position struct {
@@ -40,8 +38,73 @@ var escapeMap = map[byte]byte{
 // isWindows decides that the `\r\n` is indicating one or two new line(s)
 var isWindows = runtime.GOOS == "windows"
 
+// nState indicates the inner state of the `parseNumeric` state machine
+type nState uint64
+
+const (
+	_nStart    nState = 2 << iota
+	_nZero      // 0
+	_nDot       // .
+	_nDigit0    // 0-9 after _nNoneZero
+	_nDigit1    // 0-9 after _nDot
+	_nDigit2    // 0-9 after _nExp or _nPlus or _Minus
+    _nNoneZero  // 1-9
+	_nExp       // e E
+	_nPlus      // +
+	_nMinus     // -
+)
+
+var nTypeStrings = map[nState]string{
+	_nStart:    "_nStart",
+	_nZero:     "_nZero",
+	_nDot:      "_nDot",
+	_nDigit0:   "_nDigit0",
+	_nDigit1:   "_nDigit1",
+	_nDigit2:   "_nDigit2",
+	_nNoneZero: "_nNoneZero",
+	_nExp:      "_nExp",
+	_nPlus:     "_nPlus",
+	_nMinus:    "_nMinus",
+}
+
+var nExStrings = map[nState]string{
+	_nStart:    "0123456789-",
+	_nZero:     ".eE",
+	_nNoneZero: "0123456789.eE",
+	_nDigit0:   "0123456789.eE",
+	_nDigit1:   "0123456789eE",
+	_nDigit2:   "0123456789",
+	_nDot:      "0123456789",
+	_nPlus:     "0123456789",
+	_nMinus:    "0123456789",
+	_nExp:      "0123456789+-",
+}
+
+func (st nState) match(ex ...nState) bool {
+	for _, s := range ex {
+		if uint64(st)&uint64(s) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func isNoneZero(b byte) bool { return '1' <= b && b <= '9' }
+
+func isDigit(b byte) bool { return '0' <= b && b <= '9' }
+
+func isNumericChar(b byte) bool {
+	return b == '-' || b == '+' || b == 'e' || b == 'E' || b == '.' || isDigit(b)
+}
+
 func expect(c uint8, found uint8) error {
 	return fmt.Errorf("expect '%c' but found '%c' at [%d:%d]", c, found, pos.row+1, pos.col+1)
+}
+
+func expectNState(st nState, ex []nState) error {
+	ss := make([]string, 4)
+	for _, s := range ex { ss = append(ss, nTypeStrings[s]) }
+	return fmt.Errorf("expect state = %s, but the real is %s", ss, nTypeStrings[st])
 }
 
 func expectTypeOf(ex ValueType, found ValueType) error {
@@ -49,8 +112,12 @@ func expectTypeOf(ex ValueType, found ValueType) error {
 }
 
 func expectOneOf(pattern string, found byte) error {
-	st := strings.Join(strings.Split(pattern, ""), "|")
-	return fmt.Errorf("expect one of [%s] but found '%c' at [%d:%d]", st, found, pos.row+1, pos.col+1)
+	var cs = []rune{'['}
+	for _, c := range pattern {
+		cs = append(cs, c, '|')
+	}
+	cs[len(cs)-1] = ']'
+	return fmt.Errorf("expect one of [%v] but found '%c' at [%d:%d]", cs, found, pos.row+1, pos.col+1)
 }
 
 func expectString(pattern string, found []byte) error {
@@ -206,98 +273,25 @@ func parseStr(json []byte) (str *Jzon, rem []byte, err error) {
 }
 
 func parseNum(json []byte) (num *Jzon, rem []byte, err error) {
-	num = New(JzTypeNum)
+	num = New(JzTypeInt)
 	var n int64
 	var f float64
-    type state uint64
-	const (
-	    _Start state = 2 << iota
-	    _Zero                    // 0
-	    _Dot                     // .
-	    _Digit                   // 0-9
-	    _NoneZero                // 1-9
-	    _Exp                     // e E
-	    _Plus                    // +
-        _Minus                   // -
-	    _End
-    )
+	var isInt bool
 
-	var st = _Start
-	var pst = &st
-	var ex = []state{_Zero, _Digit}
-
-	var match = func(ex ... state) bool {
-	    for _, s := range ex {
-	        if uint64(*pst) | uint64(s) > 0 {
-	            return true
-            }
-        }
-        return false
-    }
-
-    var isNoneZero = func(b byte) bool {
-        return '0' <= b && b <= '9'
-    }
-
-    var isDigit = func(b byte) bool {
-        return '1' <= b && b <= '9'
-    }
-
-	if json[0] == '-' {
-		var neg = New(JzTypeNum)
-
-		pos.col++
-		neg, rem, err = parseNum(json[1:])
-		neg.num = -neg.num
-		return neg, rem, err
-	}
-
-	if json[0] == '0' && json[1] != '.' {
-		err = expect('.', json[1])
-		return
-	}
-
-	rem = json
-
-	for {
-		switch {
-		case rem[0] == '0' && match(_Start):
-		    ex = []state{_Dot}
-		    st = _Zero
-
-        case isNoneZero(rem[0]) && match(_Start):
-            ex = []state{_Dot, _Digit}
-            st = _NoneZero
-
-        case rem[0] == '.' && match(_Zero, _Digit, _NoneZero):
-            ex = []state{_Digit}
-            st = _Dot
-
-        case isDigit(rem[0]) && match(_Digit, _NoneZero):
-            ex = []state{_Digit, _Exp, _Dot, _End}
-            st = _Digit
-
-        case isDigit(rem[0]) && match(_Dot):
-
-        case rem[0] == 'e' && match(_Digit):
-
-        case isDigit(rem[0]) && match(_Exp, _Plus, _Minus):
-
-
-		}
-	}
-
-
-	_, err = fmt.Sscanf(string(json), "%d", &n)
+	n, f, isInt, rem, err = parseNumeric(json)
 	if err != nil {
-		err = expectOneOf("0123456789.e+-", json[0])
 		return
 	}
 
-	nParsed := len(strconv.FormatInt(n, 10))
-	num.num = n
-	pos.col += nParsed
-	return num, json[nParsed:], nil
+	if isInt {
+		num.Type = JzTypeInt
+		num.num = n
+	} else {
+		num.Type = JzTypeFlt
+		num.flt = f
+	}
+
+	return
 }
 
 func parseTru(json []byte) (bol *Jzon, rem []byte, err error) {
@@ -386,6 +380,9 @@ func parseKey(json []byte) (k string, rem []byte, err error) {
 		case rem[0] == '\\' && rem[1] == 'u':
 			utf8str := make([]byte, 0, SHORT_STRING_OPTIMIZED_CAP)
 			utf8str, rem, err = parseUnicode(rem)
+			if err != nil {
+				return
+			}
 			for _, c := range utf8str {
 				parsed = append(parsed, c)
 			}
@@ -425,12 +422,12 @@ func parseEscaped(json []byte) (escaped byte, rem []byte, err error) {
 }
 
 func parseUnicode(json []byte) (parsed []byte, rem []byte, err error) {
-    // a valid UTF-8 code point is consisted of n bytes (1 < n < 5):
-    // a leading byte begins with n * 1 and n-1 bytes begin with 10
-    // 0000 0000 - 0000 007F | 0xxxxxxx
-    // 0000 0080 - 0000 07FF | 110xxxxx 10xxxxxx
-    // 0000 0800 - 0000 FFFF | 1110xxxx 10xxxxxx 10xxxxxx
-    // 0001 0000 - 0010 FFFF | 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+	// a valid UTF-8 code point is consisted of n bytes (1 < n < 5):
+	// a leading byte begins with n * 1 and n-1 bytes begin with 10
+	// 0000 0000 - 0000 007F | 0xxxxxxx
+	// 0000 0080 - 0000 07FF | 110xxxxx 10xxxxxx
+	// 0000 0800 - 0000 FFFF | 1110xxxx 10xxxxxx 10xxxxxx
+	// 0001 0000 - 0010 FFFF | 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
 
 	var uc, uc2 uint32
 	var isInvalidCodePoint = func(cp uint32) bool {
@@ -469,7 +466,7 @@ func parseUnicode(json []byte) (parsed []byte, rem []byte, err error) {
 			return
 		}
 
-		uc = 0x10000 + (((uc & 0x3FF) << 10 | uc2) & 0x3FF)
+		uc = 0x10000 + (((uc&0x3FF)<<10 | uc2) & 0x3FF)
 	}
 
 	var nBytes int
@@ -510,10 +507,14 @@ func parseHex4(json []byte) (hex uint32, rem []byte, err error) {
 		hc := uint32(0)
 		ex := uint32(0x1000 >> (i * 4))
 		switch {
-		case '0' <= rem[i] && rem[i] <= '9': hc = uint32(0  + rem[i] - '0')
-		case 'A' <= rem[i] && rem[i] <= 'F': hc = uint32(10 + rem[i] - 'A')
-		case 'a' <= rem[i] && rem[i] <= 'f': hc = uint32(10 + rem[i] - 'a')
-		default: return hex, nil, expectOneOf("0123456789ABCDEF", rem[i])
+		case '0' <= rem[i] && rem[i] <= '9':
+			hc = uint32(0 + rem[i] - '0')
+		case 'A' <= rem[i] && rem[i] <= 'F':
+			hc = uint32(10 + rem[i] - 'A')
+		case 'a' <= rem[i] && rem[i] <= 'f':
+			hc = uint32(10 + rem[i] - 'a')
+		default:
+			return hex, nil, expectOneOf("0123456789ABCDEF", rem[i])
 		}
 
 		hex += hc * ex
@@ -521,4 +522,135 @@ func parseHex4(json []byte) (hex uint32, rem []byte, err error) {
 	}
 
 	return hex, rem[4:], nil
+}
+
+func parseNumeric(json []byte) (n int64, f float64, isInt bool, rem []byte, err error) {
+	var st = _nStart
+	var ex = []nState{_nZero, _nNoneZero}
+	var metExpPlus = false
+	var nAfterDot = 1.0
+	var nAfterExp = 0
+
+	isInt = true
+	rem = json
+
+	// since the leading '-' should just occurs less than once
+	if rem[0] == '-' {
+		if len(rem) > 1 && !('0' <= rem[1] && rem[1] <= '9') {
+			err = expectOneOf("0123456789", rem[1])
+			return
+		}
+		pos.col++
+		n, f, isInt, rem, err = parseNumeric(rem[1:])
+		n = -n
+		return
+	}
+
+	for {
+		switch {
+		case len(rem) == 0: // Must be the first condition, avoiding illegal memory access
+			if isInt { f = 0 } else { n = 0 }
+			return
+
+		case rem[0] == '0' && st.match(_nStart):
+			ex = []nState{_nDot, _nExp}
+			st = _nZero
+
+			f = 0
+			n = 0
+			rem = rem[1:]
+			pos.col++
+
+		case rem[0] == '.' && st.match(_nZero, _nDigit0, _nNoneZero):
+			ex = []nState{_nDigit1}
+			st = _nDot
+
+			isInt = false
+			rem = rem[1:]
+			pos.col++
+
+		case isDigit(rem[0]) && st.match(_nDot, _nDigit1):
+			ex = []nState{_nDigit1, _nExp}
+			st = _nDigit1
+
+			nAfterDot *= 10
+			f += float64(float64(rem[0]-'0') / nAfterDot)
+			rem = rem[1:]
+			pos.col++
+
+		case isNoneZero(rem[0]) && st.match(_nStart):
+			ex = []nState{_nDot, _nDigit0, _nExp}
+			st = _nNoneZero
+
+			n = int64(rem[0] - '0')
+			f = float64(rem[0] - '0')
+			rem = rem[1:]
+			pos.col++
+
+		case isDigit(rem[0]) && st.match(_nDigit0, _nNoneZero):
+			ex = []nState{_nDigit0, _nExp, _nDot}
+			st = _nDigit0
+
+			n = n*10 + int64(rem[0]-'0')
+			f = f*10 + float64(rem[0]-'0')
+			rem = rem[1:]
+			pos.col++
+
+		case (rem[0] == 'e' || rem[0] == 'E') && st.match(_nZero, _nNoneZero, _nDigit0, _nDigit1):
+			ex = []nState{_nPlus, _nMinus, _nDigit2}
+			st = _nExp
+
+			isInt = false
+			metExpPlus = true
+			rem = rem[1:]
+			pos.col++
+
+		case rem[0] == '+' && st.match(_nExp):
+			ex = []nState{_nDigit2}
+			st = _nPlus
+
+			metExpPlus = true
+			rem = rem[1:]
+			pos.col++
+
+		case rem[0] == '-' && st.match(_nExp):
+			ex = []nState{_nDigit2}
+			st = _nMinus
+
+			metExpPlus = false
+			rem = rem[1:]
+			pos.col++
+
+		case isDigit(rem[0]) && st.match(_nExp, _nPlus, _nMinus, _nDigit2):
+			ex = []nState{_nDigit2}
+			st = _nDigit2
+
+			nAfterExp = nAfterExp*10 + int(rem[0]-'0')
+			if metExpPlus {
+				for i := 0; i < nAfterExp; i++ {
+					f *= 10
+				}
+			} else {
+				for i := 0; i < nAfterExp; i++ {
+					f *= 10
+				}
+			}
+
+			rem = rem[1:]
+			pos.col++
+
+		case !isNumericChar(rem[0]) && st.match(_nZero, _nNoneZero, _nDigit0, _nDigit1, _nDigit2):
+			if isInt { f = 0 } else { n = 0 }
+			return
+
+		default:
+			if st.match(ex...) {
+				err = expectOneOf(nExStrings[st], rem[0])
+			} else {
+				err = expectNState(st, ex)
+			}
+
+			return
+		}
+	}
 }
