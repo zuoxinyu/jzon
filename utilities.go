@@ -1,8 +1,9 @@
 package jzon
 
 import (
-	"os"
 	"fmt"
+	"os"
+	"strings"
 )
 
 // Format converts raw compact JSON to human-reading text
@@ -27,66 +28,49 @@ func Compact(formatted string) (compact string, err error) {
 
 // Format generates human-reading text
 func (jz *Jzon) Format(indent int, useTab bool) string {
-	// TODO:
-
 	return ""
 }
 
 // Compact generates compact text
 func (jz *Jzon) Compact() string {
-	// TODO:
+	switch jz.Type {
+	case JzTypeArr:
+	    var ss []string
+		as, _ := jz.AMap(func(v *Jzon) Any { return v.Compact() })
+		for _, a := range as { ss = append(ss, a.(string))}
+		return "[" + strings.Join(ss, ",") + "]"
+
+	case JzTypeObj:
+        var ss []string
+		as, _ := jz.OMap(func(k string, v *Jzon) Any { return "\"" + k + "\"" + ":" + v.Compact() })
+        for _, a := range as { ss = append(ss, a.(string))}
+        return "{" + strings.Join(ss, ",") + "}"
+
+	case JzTypeStr: // maybe should de-escape characters?
+		s, _ := jz.String()
+		return "\"" + s + "\""
+
+	case JzTypeInt:
+		n, _ := jz.Integer()
+		return fmt.Sprintf("%d", n)
+
+	case JzTypeFlt:
+		f, _ := jz.Float()
+		return fmt.Sprintf("%f", f)
+
+	case JzTypeBol:
+		b, _ := jz.Bool()
+		if b { return "true" } else { return "false" }
+
+	case JzTypeNul:
+		return "null"
+	}
 	return ""
 }
 
 // Print prints human-reading JSON text to writer
 func (jz *Jzon) Print() {
-	switch jz.Type {
-	case JzTypeArr:
-		fmt.Printf("[")
-		jz.AMap(func(v *Jzon) []Any {
-			v.Print()
-			fmt.Printf(",")
-			return nil
-		})
-        if l, _ := jz.Length(); l > 0 {
-            fmt.Printf("\b]")
-        } else {
-            fmt.Printf("]")
-        }
-
-    case JzTypeObj:
-        fmt.Printf("{")
-        jz.OMap(func(k string, v *Jzon) Any {
-            fmt.Printf("\"%s\":", k)
-            v.Print()
-            fmt.Printf(",")
-            return nil
-        })
-        if l, _ := jz.Length(); l > 0 {
-            fmt.Printf("\b}")
-        } else {
-            fmt.Printf("}")
-        }
-
-    case JzTypeStr:
-        s, _ := jz.String()
-        fmt.Printf("\"%s\"", s)
-
-    case JzTypeInt:
-        n, _ := jz.Integer()
-        fmt.Printf("%d", n)
-
-    case JzTypeFlt:
-        f, _ := jz.Float()
-        fmt.Printf("%f", f)
-
-    case JzTypeBol:
-        b, _ := jz.Bool()
-        fmt.Printf("%v", b)
-
-    case JzTypeNul:
-        fmt.Printf("null")
-	}
+    fmt.Print(jz.Compact())
 }
 
 // Coloring prints colored and formatted JSON text on the terminal. if it's not

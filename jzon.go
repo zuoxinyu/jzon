@@ -268,7 +268,7 @@ func (jz *Jzon) Remove(i int) (err error) {
 }
 
 // AMap is just map for array, if it's not an array, an error will be thrown out
-func (jz *Jzon) AMap(itFunc func(g *Jzon) []Any) (res []Any, err error) {
+func (jz *Jzon) AMap(itFunc func(g *Jzon) Any) (res []Any, err error) {
 	if jz.Type != JzTypeArr {
 		return res, expectTypeOf(JzTypeArr, jz.Type)
 	}
@@ -351,9 +351,7 @@ func (jz *Jzon) OFilter(predictFunc func(key string, value *Jzon) bool) (res *Jz
 func (jz *Jzon) Map(mapFunc func(string, *Jzon) Any) (res Any, err error) {
 	switch jz.Type {
 	case JzTypeArr:
-		return jz.AMap(func(j *Jzon) (res []Any) {
-			return append(res, mapFunc("", j))
-		})
+		return jz.AMap(func(j *Jzon) (res Any) { return mapFunc("", j) })
 
 	case JzTypeObj:
 		return jz.OMap(mapFunc)

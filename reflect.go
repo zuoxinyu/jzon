@@ -1,17 +1,195 @@
 package jzon
 
-import "reflect"
+import (
+    "fmt"
+    "reflect"
+)
+
+// Serializable is the interface makes those types which implemented
+// it can be serialize from user custom operations
+type Serializable interface {
+    Serialize() string
+}
+
+// Deserializable makes
+type Deserializable interface {
+    Deserialize() string
+}
+
+// TAG_NAME is the default leading tag when tag an structure field
+const TAG_NAME = "jzon"
 
 // Serialize parses a tagged structure to Jzon
-func Serialize(s Any) (jz Jzon) {
-	// TODO:
-	return
+func Serialize(s Any) (jz *Jzon, err error) {
+    v := reflect.ValueOf(s)
+    return serialize(v)
+}
+
+func serialize(v reflect.Value) (jz *Jzon, err error){
+    t := v.Type()
+    k := v.Kind()
+
+    // TODO: serialize those type which implements interface jzon.Serializable
+    // method := v.MethodByName("Serialize")
+    // if method.IsValid() {
+    //     rs := method.Call(nil)
+    //     if len(rs) == 1 && rs[0].Kind() == reflect.String { }
+    // }
+
+    switch k {
+    case reflect.Struct:
+        jz = New(JzTypeObj)
+        var val *Jzon
+        for i := 0; i < t.NumField(); i++ {
+            key := t.Field(i).Tag.Get(TAG_NAME)
+            val, err = serialize(v.Field(i))
+            if err != nil { return }
+            t1 := v.Field(i).Type()
+            k1 := v.Field(i).Kind()
+            fmt.Printf("type: %-12s | kind: %-10s | tag: %s\n", t1, k1, key)
+            // ignore field without `jzon` tag or was marked as ignorable
+            // TODO: implement the `omitempty` and `string` tag
+            if key == "," {
+                key = t.Field(i).Name
+            }
+
+            if key != "" && key != "-" { jz.Insert(key, val) }
+        }
+
+    case reflect.Map:
+        jz = New(JzTypeObj)
+        var val *Jzon
+        var keys = v.MapKeys()
+        for _, key := range keys {
+            if key.Kind() != reflect.String {
+                err = fmt.Errorf("only type map[string]T can be serialized")
+                return
+            }
+
+            val, err = serialize(v.MapIndex(key))
+            if err != nil { return }
+            jz.Insert(key.String(), val)
+        }
+
+    case reflect.Slice:
+        if v.IsNil() {
+            jz = New(JzTypeNul)
+            return
+        }
+        fallthrough
+
+    case reflect.Array:
+        jz = New(JzTypeArr)
+        var val *Jzon
+        for i := 0; i < v.Len(); i++ {
+            val, err = serialize(v.Index(i))
+            if err != nil { return }
+            jz.Append(val)
+        }
+
+    case reflect.String:
+        jz = NewFromAny(v.String())
+
+    case reflect.Float32, reflect.Float64:
+        jz = NewFromAny(v.Float())
+
+    case reflect.Bool:
+        jz = NewFromAny(v.Bool())
+
+    case reflect.Ptr:
+        if v.IsNil() {
+            jz = New(JzTypeNul)
+        } else {
+            err = fmt.Errorf("only nil ptr can be serialized")
+        }
+
+    case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+        reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32:
+        jz = NewFromAny(v.Int())
+
+    default:
+        err = fmt.Errorf("can not serialize variable of kind [%s] to Jzon", k)
+    }
+
+    return
 }
 
 // Deserialize parses JSON string to a structure of arbitrary type
-func Deserialize(json string, s Any) (err error) {
-	// TODO:
-	return
+func Deserialize(json []byte, ptr Any) (err error) {
+    jz, err := Parse(json)
+    if err != nil {
+        return
+    }
+
+    p := reflect.ValueOf(ptr)
+    v := reflect.Indirect(p)
+    t := reflect.TypeOf(v)
+    k := t.Kind()
+
+    if k != reflect.Ptr || v.IsNil() {
+        err = fmt.Errorf("expect nono-nil pointer, but the given value is of kind %s", k)
+    }
+
+	return deserialize(jz, &v)
+}
+
+func deserialize(jz *Jzon, v *reflect.Value) (err error){
+    t := reflect.TypeOf(*v)
+    k := t.Kind()
+    fmt.Printf("type: %-12s | kind: %-10s | tag: %s\n", t, k, "")
+
+    switch {
+    case jz.Type == JzTypeObj && k == reflect.Struct:
+        for i := 0; i < t.NumField(); i++ {
+            tag := t.Field(i).Tag.Get(TAG_NAME)
+            if tag == "," {
+                tag = t.Field(i).Name
+                fmt.Printf("type: %-12s | kind: %-10s | tag: %s\n", t, k, tag)
+            }
+
+            if tag == "" || tag == "-" {
+                continue
+            }
+
+            jv, err := jz.ValueOf(tag)
+            if err == nil {
+                var vv reflect.Value
+                deserialize(jv, &vv)
+                v.Field(i).Set(vv)
+            }
+        }
+
+    case jz.Type == JzTypeObj && k == reflect.Map:
+        // TODO: deserialize those types which implemented `Deserialize()`
+        m, _ := jz.Object()
+        for jk, jv := range m {
+            var vv reflect.Value
+            var vk reflect.Value
+            vk.SetString(jk)
+            deserialize(jv, &vv)
+            v.SetMapIndex(vk, vv)
+        }
+
+    case jz.Type == JzTypeStr && k == reflect.String:
+        str, _ := jz.String()
+        v.SetString(str)
+
+    case jz.Type == JzTypeInt && k == reflect.Int:
+        n, _ := jz.Integer()
+        v.SetInt(n)
+
+    case jz.Type == JzTypeFlt && k == reflect.Float64:
+        f, _ := jz.Float()
+        v.SetFloat(f)
+
+    case jz.Type == JzTypeBol && k == reflect.Bool:
+        b, _ := jz.Bool()
+        v.SetBool(b)
+
+    case jz.Type == JzTypeNul && k == reflect.Slice:
+        v.SetLen(0)
+    }
+    return
 }
 
 // Value returns value of type interface{}, for maps
@@ -51,7 +229,7 @@ func NewFromAny(v Any) *Jzon {
 		jz.num = reflect.ValueOf(v).Int()
 
 	case float32, float64:
-		jz.Type = JzTypeInt
+		jz.Type = JzTypeFlt
 		jz.flt = reflect.ValueOf(v).Float()
 
 	case string:
