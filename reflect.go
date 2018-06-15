@@ -5,19 +5,24 @@ import (
 	"reflect"
 )
 
-// Serializable is the interface makes those types which implemented
-// it can be serialize from user custom operations
+// Serializable makes those types which implemented
+// it can be serialized from user custom operation
 type Serializable interface {
-	Serialize() string
+	Serialize() []byte
 }
 
 // Deserializable makes
 type Deserializable interface {
-	Deserialize() string
+	Deserialize([]byte, *Any)
 }
 
-// TAG_NAME is the default leading tag when tag an structure field
-const TAG_NAME = "jzon"
+// TAG_NAME is the default leading tag for tagging a structure field
+var TAG_NAME = "jzon"
+
+// SetTagName lets users use custom tag name at serializing and deserializing
+func SetTagName(tag string) {
+	TAG_NAME = tag
+}
 
 // Serialize parses a tagged structure to Jzon
 func Serialize(s Any) (jz *Jzon, err error) {
@@ -29,7 +34,7 @@ func serialize(v reflect.Value) (jz *Jzon, err error) {
 	t := v.Type()
 	k := v.Kind()
 
-	// TODO: serialize those type which implements interface jzon.Serializable
+	// TODO: serialize those types which implemented interface `jzon.Serializable`
 	// method := v.MethodByName("Serialize")
 	// if method.IsValid() {
 	//     rs := method.Call(nil)
@@ -132,7 +137,7 @@ func Deserialize(json []byte, ptr Any) (err error) {
 	v := reflect.Indirect(p)
 	t := v.Type()
 	k := t.Kind()
-	fmt.Printf("type: %-18s | kind: %-18s\n", t, k)
+	//fmt.Printf("type: %-18s | kind: %-18s\n", t, k)
 
 	if k != reflect.Ptr || v.IsNil() {
 		err = fmt.Errorf("expect nono-nil pointer, but the given value is of kind %s", k)
@@ -150,15 +155,15 @@ func deserialize(jz *Jzon, v *reflect.Value) (err error) {
 	case jz.Type == JzTypeObj && k == reflect.Struct:
 		for i := 0; i < t.NumField(); i++ {
 			v1 := v.Field(i)
-			t1 := v.Field(i).Type()
-			k1 := t1.Kind()
+			//t1 := v.Field(i).Type()
+			//k1 := t1.Kind()
 			tag := t.Field(i).Tag.Get(TAG_NAME)
 
 			if tag == "," {
 				tag = t.Field(i).Name
 			}
 
-			fmt.Printf("type: %-18s | kind: %-10s | tag: %s\n", t1, k1, tag)
+			//fmt.Printf("type: %-18s | kind: %-10s | tag: %s\n", t1, k1, tag)
 
 			if tag == "" || tag == "-" {
 				continue
@@ -220,6 +225,7 @@ func deserialize(jz *Jzon, v *reflect.Value) (err error) {
 	case jz.Type == JzTypeNul && k == reflect.Slice:
 		v.SetLen(0)
 	}
+
 	return
 }
 
