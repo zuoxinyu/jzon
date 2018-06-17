@@ -68,18 +68,40 @@ func serialize(v reflect.Value) (jz *Jzon, err error) {
 	case reflect.Map:
 		jz = New(JzTypeObj)
 		var val *Jzon
-		var keys = v.MapKeys()
-		for _, key := range keys {
-			if key.Kind() != reflect.String {
-				err = fmt.Errorf("only type map[string]T can be serialized")
-				return
-			}
+		var toString func(v *reflect.Value) string
+		kt := t.Key()
+		_, ok := kt.MethodByName("SerializeJzon")
 
+		if kt.Kind() == reflect.String {
+			toString = func(v *reflect.Value) string {
+				return v.String()
+			}
+		} else if ok {
+			toString = func(v *reflect.Value) string {
+				mt := (*v).MethodByName("SerializeJzon")
+				rs := mt.Call(nil)
+				if rs[0].IsValid() && rs[0].Type().Kind() == reflect.String {
+					return rs[0].String()
+				}
+
+				return ""
+			}
+		} else {
+			err = fmt.Errorf("key must be of type string or implement the interface jjzon.Serializable")
+			return
+		}
+
+		var keys = v.MapKeys()
+		var str string
+		for _, key := range keys {
 			val, err = serialize(v.MapIndex(key))
 			if err != nil {
 				return
 			}
-			jz.Insert(key.String(), val)
+
+			str = toString(&key)
+
+			jz.Insert(str, val)
 		}
 
 	case reflect.Slice:
@@ -149,21 +171,21 @@ func Deserialize(json []byte, ptr Any) (err error) {
 func deserialize(jz *Jzon, v *reflect.Value) (err error) {
 	t := v.Type()
 	k := t.Kind()
-	// fmt.Printf("type: %-18s | kind: %-10s | tag: \n", t, k)
 
 	switch {
 	case jz.Type == JzTypeObj && k == reflect.Struct:
 		for i := 0; i < t.NumField(); i++ {
 			v1 := v.Field(i)
-			//t1 := v.Field(i).Type()
-			//k1 := t1.Kind()
+			n1 := t.Field(i).Name
+			t1 := v.Field(i).Type()
+			k1 := t1.Kind()
 			tag := t.Field(i).Tag.Get(TAG_NAME)
 
 			if tag == "," {
 				tag = t.Field(i).Name
 			}
 
-			//fmt.Printf("type: %-18s | kind: %-10s | tag: %s\n", t1, k1, tag)
+			fmt.Printf("name: %-18s | type: %-18s | kind: %-10s | tag: %s\n", n1, t1, k1, tag)
 
 			if tag == "" || tag == "-" {
 				continue
@@ -181,26 +203,39 @@ func deserialize(jz *Jzon, v *reflect.Value) (err error) {
 
 	case jz.Type == JzTypeObj && k == reflect.Map:
 		// TODO: deserialize those types which implemented `Deserialize()`
-		vks := v.MapKeys()
 		m, _ := jz.Object()
-
-		for _, vk := range vks {
-			v1 := v.MapIndex(vk)
-
-			k1 := vk.String()
-			jv, ok := m[k1]
-
-			if !ok {
-				return fmt.Errorf("no such key")
-			} else {
-				err = deserialize(jv, &v1)
-			}
+		vt := t.Elem()
+		if v.IsNil() {
+			v.Set(reflect.MakeMap(t))
 		}
 
-	case jz.Type == JzTypeArr && (k == reflect.Slice || k == reflect.Array):
-		l := v.Len()
-		a, _ := jz.Array()
+		for jk, jv := range m {
+			pv1 := reflect.New(vt)
+			v1 := reflect.Indirect(pv1)
+			k1 := reflect.ValueOf(jk)
+			err = deserialize(jv, &v1)
+			if err != nil {
+				return
+			}
 
+			v.SetMapIndex(k1, v1)
+		}
+
+	case jz.Type == JzTypeArr && k == reflect.Slice:
+		a, _ := jz.Array()
+		if v.IsNil() {
+			v.Set(reflect.MakeSlice(t, len(a), len(a)))
+		}
+
+		for i, jv := range a {
+			v1 := v.Index(i)
+			deserialize(jv, &v1)
+			v1.Set(v1)
+		}
+
+	case jz.Type == JzTypeArr && k == reflect.Array:
+		a, _ := jz.Array()
+		l := len(a)
 		for i := 0; i < l; i++ {
 			v1 := v.Index(i)
 			deserialize(a[i], &v1)
@@ -210,11 +245,15 @@ func deserialize(jz *Jzon, v *reflect.Value) (err error) {
 		str, _ := jz.String()
 		v.SetString(str)
 
-	case jz.Type == JzTypeInt && k == reflect.Int:
+	case jz.Type == JzTypeInt && (k == reflect.Int || k == reflect.Int8 || k == reflect.Int16 || k == reflect.Int32 || k == reflect.Int64):
 		n, _ := jz.Integer()
 		v.SetInt(n)
 
-	case jz.Type == JzTypeFlt && k == reflect.Float64:
+	case jz.Type == JzTypeInt && (k == reflect.Uint || k == reflect.Uint8 || k == reflect.Uint16 || k == reflect.Uint32):
+		n, _ := jz.Integer()
+		v.SetInt(n)
+
+	case jz.Type == JzTypeFlt && (k == reflect.Float64 || k == reflect.Float32):
 		f, _ := jz.Float()
 		v.SetFloat(f)
 

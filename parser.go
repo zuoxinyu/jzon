@@ -112,12 +112,11 @@ func expectTypeOf(ex ValueType, found ValueType) error {
 }
 
 func expectOneOf(pattern string, found byte) error {
-	var cs = []rune{'['}
+	var cs = []rune{}
 	for _, c := range pattern {
 		cs = append(cs, c, '|')
 	}
-	cs[len(cs)-1] = ']'
-	return fmt.Errorf("expect one of [%v] but found '%c' at [%d:%d]", cs, found, pos.row+1, pos.col+1)
+	return fmt.Errorf("expect one of [%s] but found '%c' at [%d:%d]", string(cs), found, pos.row+1, pos.col+1)
 }
 
 func expectString(pattern string, found []byte) error {

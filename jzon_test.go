@@ -1,6 +1,7 @@
 package jzon
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"strconv"
@@ -473,8 +474,8 @@ type User struct {
 
 type ImpInterface int
 
-func (i ImpInterface) Serialize() string {
-	return "INT:" + strconv.Itoa(int(i))
+func (i ImpInterface) SerializeJzon() string {
+	return "INT" + strconv.Itoa(int(i))
 }
 
 type Nested struct {
@@ -502,6 +503,20 @@ func TestSerialize(t *testing.T) {
 
 	jz.Print()
 	fmt.Printf("\n")
+
+	m := map[ImpInterface]int{
+		4: 1,
+		3: 2,
+		2: 1,
+	}
+
+	jz1, err := Serialize(m)
+	if err != nil {
+		t.Error(err)
+	}
+
+	jz1.Print()
+	fmt.Printf("\n")
 }
 
 func TestDeserialize(t *testing.T) {
@@ -514,4 +529,33 @@ func TestDeserialize(t *testing.T) {
 	}
 	fmt.Printf("%#v\n", user)
 
+}
+
+// Benchmarks
+
+func BenchmarkJzonParse(b *testing.B) {
+	content, err := ioutil.ReadFile("../data/twitter.json")
+	if err != nil {
+		b.Error(err)
+	}
+	b.ResetTimer()
+	b.SetBytes(0)
+	for i := 0; i < b.N; i++ {
+		Parse(content)
+	}
+	b.ReportAllocs()
+}
+
+func BenchmarkJsonParse(b *testing.B) {
+	content, err := ioutil.ReadFile("../data/twitter.json")
+	if err != nil {
+		b.Error(err)
+	}
+	var m map[string]interface{}
+	b.ResetTimer()
+	b.SetBytes(0)
+	for i := 0; i < b.N; i++ {
+		json.Unmarshal(content, &m)
+	}
+	b.ReportAllocs()
 }

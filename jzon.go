@@ -1,8 +1,8 @@
 package jzon
 
 import (
-    "errors"
-    "fmt"
+	"errors"
+	"fmt"
 )
 
 type ValueType int
@@ -19,9 +19,15 @@ type Jzon struct {
 	bol  bool
 }
 
+// LazyJzon is the lazy version
+type LazyJzon struct {
+	Type  ValueType
+	slice []byte
+}
+
 const (
 	JzTypeStr ValueType = iota
-    JzTypeInt
+	JzTypeInt
 	JzTypeFlt
 	JzTypeBol
 	JzTypeObj
@@ -46,10 +52,12 @@ func New(t ValueType) *Jzon {
 	switch t {
 	case JzTypeStr:
 	case JzTypeInt:
-    case JzTypeFlt:
+	case JzTypeFlt:
 	case JzTypeBol:
-	case JzTypeObj: v.obj = make(map[string]*Jzon)
-	case JzTypeArr: v.arr = make([]*Jzon, 0)
+	case JzTypeObj:
+		v.obj = make(map[string]*Jzon)
+	case JzTypeArr:
+		v.arr = make([]*Jzon, 0)
 	case JzTypeNul:
 	}
 
@@ -112,11 +120,11 @@ func (jz *Jzon) Integer() (n int64, err error) {
 
 // Float returns float64 value, if it's not a float, an error will be thrown out
 func (jz *Jzon) Float() (f float64, err error) {
-    if jz.Type != JzTypeFlt {
-        return f, expectTypeOf(JzTypeInt, jz.Type)
-    }
+	if jz.Type != JzTypeFlt {
+		return f, expectTypeOf(JzTypeInt, jz.Type)
+	}
 
-    return jz.flt, nil
+	return jz.flt, nil
 }
 
 // Null returns nil value, if it's not a boolean, an error will be thrown out
