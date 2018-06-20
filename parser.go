@@ -130,7 +130,7 @@ func expectCodePoint() error {
 func trimWhiteSpaces(str []byte) []byte {
 	for {
 		switch {
-		case string(str[0:2]) == "\r\n" && isWindows:
+		case len(str) > 1 && string(str[0:2]) == "\r\n" && isWindows:
 			pos.row += 1
 			pos.col = 0
 			str = str[2:]
