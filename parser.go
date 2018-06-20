@@ -506,7 +506,7 @@ func parseHex4(json []byte) (hex uint32, rem []byte, err error) {
 		hc := uint32(0)
 		ex := uint32(0x1000 >> (i * 4))
 		switch {
-		case '0' <= rem[i] && rem[i] <= '9': hc = uint32(0 + rem[i] - '0')
+		case '0' <= rem[i] && rem[i] <= '9': hc = uint32( 0 + rem[i] - '0')
 		case 'A' <= rem[i] && rem[i] <= 'F': hc = uint32(10 + rem[i] - 'A')
 		case 'a' <= rem[i] && rem[i] <= 'f': hc = uint32(10 + rem[i] - 'a')
 		default: return hex, nil, expectOneOf("0123456789ABCDEF", rem[i])

@@ -176,16 +176,16 @@ func deserialize(jz *Jzon, v *reflect.Value) (err error) {
 	case jz.Type == JzTypeObj && k == reflect.Struct:
 		for i := 0; i < t.NumField(); i++ {
 			v1 := v.Field(i)
-			n1 := t.Field(i).Name
-			t1 := v.Field(i).Type()
-			k1 := t1.Kind()
+			// n1 := t.Field(i).Name
+			// t1 := v.Field(i).Type()
+			// k1 := t1.Kind()
 			tag := t.Field(i).Tag.Get(TAG_NAME)
 
 			if tag == "," {
 				tag = t.Field(i).Name
 			}
 
-			fmt.Printf("name: %-18s | type: %-18s | kind: %-10s | tag: %s\n", n1, t1, k1, tag)
+			// fmt.Printf("name: %-18s | type: %-18s | kind: %-10s | tag: %s\n", n1, t1, k1, tag)
 
 			if tag == "" || tag == "-" {
 				continue
