@@ -159,7 +159,7 @@ func Deserialize(json []byte, ptr Any) (err error) {
 	v := reflect.Indirect(p)
 	t := v.Type()
 	k := t.Kind()
-	//fmt.Printf("type: %-18s | kind: %-18s\n", t, k)
+	// fmt.Printf("type: %-18s | kind: %-18s\n", t, k)
 
 	if k != reflect.Ptr || v.IsNil() {
 		err = fmt.Errorf("expect nono-nil pointer, but the given value is of kind %s", k)
@@ -276,22 +276,7 @@ func (jz *Jzon) Value(t ValueType) (v Any, err error) {
 		return
 	}
 
-	switch t {
-	case JzTypeStr:
-		v = jz.str
-	case JzTypeInt:
-		v = jz.num
-	case JzTypeBol:
-		v = jz.bol
-	case JzTypeObj:
-		v = jz.obj
-	case JzTypeArr:
-		v = jz.arr
-	case JzTypeNul:
-		v = nil
-	}
-
-	return v, nil
+	return jz.data, nil
 }
 
 // NewFromAny allocates and assigns a Jzon node on the heap, if the given `v` is of type
@@ -308,31 +293,31 @@ func NewFromAny(v Any) *Jzon {
 	switch v.(type) {
 	case int, int16, int32, int64, uint, uint16, uint32:
 		jz.Type = JzTypeInt
-		jz.num = reflect.ValueOf(v).Int()
+		jz.data = v
 
 	case float32, float64:
 		jz.Type = JzTypeFlt
-		jz.flt = reflect.ValueOf(v).Float()
+		jz.data = v
 
 	case string:
 		jz.Type = JzTypeStr
-		jz.str = v.(string)
+		jz.data = v
 
 	case []byte:
 		jz.Type = JzTypeStr
-		jz.str = string(v.([]byte))
+		jz.data = v
 
 	case bool:
 		jz.Type = JzTypeBol
-		jz.bol = v.(bool)
+		jz.data = v
 
 	case []*Jzon:
 		jz.Type = JzTypeArr
-		jz.arr = v.([]*Jzon)
+		jz.data = v
 
 	case map[string]*Jzon:
 		jz.Type = JzTypeObj
-		jz.obj = v.(map[string]*Jzon)
+		jz.data = v
 
 	case *Jzon:
 		// TODO: deep clone

@@ -11,12 +11,7 @@ type Any interface{}
 // Jzon defines a JSON node
 type Jzon struct {
 	Type ValueType
-	arr  []*Jzon
-	obj  map[string]*Jzon
-	str  string
-	num  int64
-	flt  float64
-	bol  bool
+    data Any
 }
 
 // LazyJzon is the lazy version
@@ -55,9 +50,9 @@ func New(t ValueType) *Jzon {
 	case JzTypeFlt:
 	case JzTypeBol:
 	case JzTypeObj:
-		v.obj = make(map[string]*Jzon)
+		v.data = make(map[string]*Jzon)
 	case JzTypeArr:
-		v.arr = make([]*Jzon, 0)
+		v.data = make([]*Jzon, 0)
 	case JzTypeNul:
 	}
 
@@ -88,7 +83,7 @@ func (jz *Jzon) Object() (m map[string]*Jzon, err error) {
 		return m, expectTypeOf(JzTypeObj, jz.Type)
 	}
 
-	return jz.obj, nil
+	return jz.data.(map[string]*Jzon), nil
 }
 
 // Array returns array value, if it's not an array, an error will be thrown out
@@ -97,7 +92,7 @@ func (jz *Jzon) Array() (a []*Jzon, err error) {
 		return a, expectTypeOf(JzTypeArr, jz.Type)
 	}
 
-	return jz.arr, nil
+	return jz.data.([]*Jzon), nil
 }
 
 // String returns string value, if it's not a string, an error will be thrown out
@@ -106,7 +101,7 @@ func (jz *Jzon) String() (s string, err error) {
 		return s, expectTypeOf(JzTypeStr, jz.Type)
 	}
 
-	return jz.str, nil
+	return jz.data.(string), nil
 }
 
 // Integer returns integer value, if it's not an integer, an error will be thrown out
@@ -115,7 +110,7 @@ func (jz *Jzon) Integer() (n int64, err error) {
 		return n, expectTypeOf(JzTypeInt, jz.Type)
 	}
 
-	return jz.num, nil
+	return jz.data.(int64), nil
 }
 
 // Float returns float64 value, if it's not a float, an error will be thrown out
@@ -124,7 +119,7 @@ func (jz *Jzon) Float() (f float64, err error) {
 		return f, expectTypeOf(JzTypeInt, jz.Type)
 	}
 
-	return jz.flt, nil
+	return jz.data.(float64), nil
 }
 
 // Null returns nil value, if it's not a boolean, an error will be thrown out
@@ -142,18 +137,18 @@ func (jz *Jzon) Bool() (b bool, err error) {
 		return b, expectTypeOf(JzTypeBol, jz.Type)
 	}
 
-	return jz.bol, nil
+	return jz.data.(bool), nil
 }
 
 // Length returns the length of an object or an array, if it is an object,
 // just returns the number of keys, otherwise an error will be thrown out
 func (jz *Jzon) Length() (l int, err error) {
 	if jz.Type == JzTypeArr {
-		return len(jz.arr), nil
+		return len(jz.data.([]*Jzon)), nil
 	}
 
 	if jz.Type == JzTypeObj {
-		return len(jz.obj), nil
+		return len(jz.data.(map[string]*Jzon)), nil
 	}
 
 	return -1, errors.New("expect node of type JzTypeArr or JzTypeObj" +
@@ -167,7 +162,7 @@ func (jz *Jzon) ValueOf(k string) (v *Jzon, err error) {
 		return v, expectTypeOf(JzTypeObj, jz.Type)
 	}
 
-	v, ok := jz.obj[k]
+	v, ok := jz.data.(map[string]*Jzon)[k]
 	if !ok {
 		err = errors.New("key doesn't exist")
 		return
@@ -183,12 +178,12 @@ func (jz *Jzon) ValueAt(i int) (v *Jzon, err error) {
 		return v, expectTypeOf(JzTypeArr, jz.Type)
 	}
 
-	if i < 0 || i >= len(jz.arr) {
+	if i < 0 || i >= len(jz.data.([]*Jzon)) {
 		err = errors.New("index is out of bound")
 		return
 	}
 
-	return jz.arr[i], nil
+	return jz.data.([]*Jzon)[i], nil
 }
 
 // Keys returns all keys as an string slice in object,
@@ -198,7 +193,7 @@ func (jz *Jzon) Keys() (ks []string, err error) {
 		return ks, expectTypeOf(JzTypeObj, jz.Type)
 	}
 
-	for k := range jz.obj {
+	for k := range jz.data.(map[string]*Jzon) {
 		ks = append(ks, k)
 	}
 
@@ -212,7 +207,7 @@ func (jz *Jzon) Has(k string) (has bool, err error) {
 		return has, expectTypeOf(JzTypeArr, jz.Type)
 	}
 
-	_, ok := jz.obj[k]
+	_, ok := jz.data.(map[string]*Jzon)[k]
 	return ok, nil
 }
 
@@ -228,7 +223,7 @@ func (jz *Jzon) Insert(k string, v *Jzon) (err error) {
 		return expectTypeOf(JzTypeObj, jz.Type)
 	}
 
-	jz.obj[k] = v
+	jz.data.(map[string]*Jzon)[k] = v
 	return nil
 }
 
@@ -238,7 +233,7 @@ func (jz *Jzon) Append(v *Jzon) (err error) {
 		return expectTypeOf(JzTypeArr, jz.Type)
 	}
 
-	jz.arr = append(jz.arr, v)
+	jz.data = append(jz.data.([]*Jzon), v)
 	return nil
 }
 
@@ -249,7 +244,7 @@ func (jz *Jzon) Delete(k string) (err error) {
 		return expectTypeOf(JzTypeObj, jz.Type)
 	}
 
-	delete(jz.obj, k)
+	delete(jz.data.(map[string]*Jzon), k)
 	return nil
 }
 
@@ -260,17 +255,17 @@ func (jz *Jzon) Remove(i int) (err error) {
 		return expectTypeOf(JzTypeArr, jz.Type)
 	}
 
-	if i > len(jz.arr) || i < 0 {
+	if i > len(jz.data.([]*Jzon)) || i < 0 {
 		return errors.New("index is out of bounds")
 	}
 
-	newArr := jz.arr[0:i]
+	newArr := jz.data.([]*Jzon)[0:i]
 
-	for _, v := range jz.arr[i:] {
+	for _, v := range jz.data.([]*Jzon)[i:] {
 		newArr = append(newArr, v)
 	}
 
-	jz.arr = newArr
+	jz.data = newArr
 
 	return nil
 }
@@ -283,7 +278,7 @@ func (jz *Jzon) AMap(itFunc func(g *Jzon) Any) (res []Any, err error) {
 
 	res = make([]Any, 0)
 
-	for _, node := range jz.arr {
+	for _, node := range jz.data.([]*Jzon) {
 		res = append(res, itFunc(node))
 	}
 
@@ -298,7 +293,7 @@ func (jz *Jzon) AFilter(predictFunc func(g *Jzon) bool) (res []*Jzon, err error)
 
 	res = make([]*Jzon, 0)
 
-	for _, node := range jz.arr {
+	for _, node := range jz.data.([]*Jzon) {
 		if predictFunc(node) {
 			res = append(res, node)
 		}
@@ -315,7 +310,7 @@ func (jz *Jzon) AReduce(init Any, acc func(a *Jzon, b Any) Any) (res Any, err er
 
 	res = init
 
-	for _, node := range jz.arr {
+	for _, node := range jz.data.([]*Jzon) {
 		res = acc(node, res)
 	}
 
@@ -330,7 +325,7 @@ func (jz *Jzon) OMap(itFunc func(key string, g *Jzon) Any) (res []Any, err error
 
 	res = make([]Any, 0)
 
-	for k, v := range jz.obj {
+	for k, v := range jz.data.(map[string]*Jzon) {
 		res = append(res, itFunc(k, v))
 	}
 
@@ -345,7 +340,7 @@ func (jz *Jzon) OFilter(predictFunc func(key string, value *Jzon) bool) (res *Jz
 
 	var tmp = *jz
 
-	for k, v := range tmp.obj {
+	for k, v := range tmp.data.(map[string]*Jzon) {
 		if !predictFunc(k, v) {
 			tmp.Delete(k)
 		}

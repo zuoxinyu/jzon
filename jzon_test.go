@@ -94,7 +94,7 @@ func TestParse(t *testing.T) {
 }
 
 func TestParseObj(t *testing.T) {
-	const json = `{
+	const text = `{
 		"key1" : "value1" ,
 		"key2" : ["string",true,null,false] ,
 		"key3" : 1234,
@@ -105,7 +105,7 @@ func TestParseObj(t *testing.T) {
 		"key8" : "の"
 	}`
 
-	o, rem, err := parseObj([]byte(json))
+	o, rem, err := parseObj([]byte(text))
 	if err != nil {
 		t.Error(err)
 	}
@@ -122,12 +122,12 @@ func TestParseObj(t *testing.T) {
 }
 
 func TestParseArr(t *testing.T) {
-	const json = `[
+	const text = `[
 		"key1", "key2", "key3", "key4",
 		"key5", "key6", "key7", "key8"
 	]`
 
-	a, rem, err := parseArr([]byte(json))
+	a, rem, err := parseArr([]byte(text))
 	if err != nil {
 		t.Error(err)
 	}
@@ -243,7 +243,7 @@ func TestParseUnicode(t *testing.T) {
 		t.Errorf("expect len(rem) = 4, but rem is %s", string(rem))
 	}
 
-	kanji := []byte{}
+	kanji := make([]byte, 0)
 	for _, c := range str {
 		kanji = append(kanji, c)
 	}

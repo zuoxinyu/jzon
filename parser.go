@@ -181,6 +181,10 @@ func parseObj(json []byte) (obj *Jzon, rem []byte, err error) {
 	obj = New(JzTypeObj)
 	var k string
 	var v *Jzon
+	var m = make(map[string]*Jzon)
+	defer func() {
+	    obj.data = m
+    }()
 
 	// return empty object directly
 	var oldPos = pos
@@ -200,7 +204,7 @@ func parseObj(json []byte) (obj *Jzon, rem []byte, err error) {
 			return
 		}
 
-		obj.obj[k] = v
+		m[k] = v
 
 		rem = trimWhiteSpaces(rem)
 		if rem[0] == ',' {
@@ -223,6 +227,10 @@ func parseObj(json []byte) (obj *Jzon, rem []byte, err error) {
 func parseArr(json []byte) (arr *Jzon, rem []byte, err error) {
 	arr = New(JzTypeArr)
 	var v *Jzon
+	var slice = make([]*Jzon, 0)
+	defer func() {
+	    arr.data = slice
+    }()
 
 	// return empty array directly
 	var oldPos = pos
@@ -242,7 +250,7 @@ func parseArr(json []byte) (arr *Jzon, rem []byte, err error) {
 			return
 		}
 
-		arr.arr = append(arr.arr, v)
+		slice = append(slice, v)
 
 		rem = trimWhiteSpaces(rem)
 		if rem[0] == ',' {
@@ -267,7 +275,7 @@ func parseStr(json []byte) (str *Jzon, rem []byte, err error) {
 	var raw string
 
 	raw, rem, err = parseKey(json)
-	str.str = raw
+	str.data = raw
 	return
 }
 
@@ -284,10 +292,10 @@ func parseNum(json []byte) (num *Jzon, rem []byte, err error) {
 
 	if isInt {
 		num.Type = JzTypeInt
-		num.num = n
+		num.data= n
 	} else {
 		num.Type = JzTypeFlt
-		num.flt = f
+		num.data = f
 	}
 
 	return
@@ -296,7 +304,7 @@ func parseNum(json []byte) (num *Jzon, rem []byte, err error) {
 func parseTru(json []byte) (bol *Jzon, rem []byte, err error) {
 	bol = New(JzTypeBol)
 	if string(json[0:4]) == "true" {
-		bol.bol = true
+		bol.data = true
 		pos.col += 4
 		return bol, json[4:], nil
 	}
@@ -308,7 +316,7 @@ func parseTru(json []byte) (bol *Jzon, rem []byte, err error) {
 func parseFls(json []byte) (bol *Jzon, rem []byte, err error) {
 	bol = New(JzTypeBol)
 	if string(json[0:5]) == "false" {
-		bol.bol = false
+		bol.data = false
 		pos.col += 5
 		return bol, json[5:], nil
 	}
