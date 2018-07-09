@@ -5,8 +5,11 @@ import (
 	"fmt"
 )
 
-type ValueType int
-type Any interface{}
+// ValueType is the alias of int
+type ValueType = int
+
+// Any is the alias of interface{}
+type Any = interface{}
 
 // Jzon defines a JSON node
 type Jzon struct {

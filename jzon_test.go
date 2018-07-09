@@ -6,9 +6,11 @@ import (
 	"io/ioutil"
 	"strconv"
 	"testing"
+	"os"
 )
 
-const deepJson = `{
+const deepJSON = `
+{
 	"key-object": {
 		"key-o-o": {
 			"number": 1234,
@@ -367,7 +369,7 @@ func TestQuery(t *testing.T) {
 	var num int64
 	var str string
 
-	jz, err := Parse([]byte(deepJson))
+	jz, err := Parse([]byte(deepJSON))
 	if err != nil {
 		t.Error(err)
 	}
@@ -426,7 +428,7 @@ func TestQuery(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	jz, err := Parse([]byte(deepJson))
+	jz, err := Parse([]byte(deepJSON))
 	if err != nil {
 		t.Error(err)
 	}
@@ -440,7 +442,7 @@ func TestSearch(t *testing.T) {
 
 // utilities.go
 func TestCompact(t *testing.T) {
-	jz, err := Parse([]byte(deepJson))
+	jz, err := Parse([]byte(deepJSON))
 	if err != nil {
 		t.Error(err)
 	}
@@ -449,12 +451,26 @@ func TestCompact(t *testing.T) {
 }
 
 func TestFormat(t *testing.T) {
-	s, err := Format(deepJson, 0, false)
+	jz, err := Parse([]byte(deepJSON))
 	if err != nil {
 		t.Error(err)
 	}
 
-	fmt.Print(s)
+	fmt.Println()
+	fmt.Println()
+	fmt.Print(jz.Format(0, 2))
+	fmt.Println()
+	fmt.Println()
+}
+
+func TestColoring(t *testing.T) {
+	jz, err := Parse([]byte(deepJSON))
+	if err != nil {
+		t.Error(err)
+	}
+
+	jz.Coloring(os.Stdout)
+	fmt.Println()
 }
 
 // reflect.go
