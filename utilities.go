@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// *nix TTY colors
 const (
     BLACK     = "\033[0;30m"
     RED       = "\033[0;31m"
@@ -63,7 +64,7 @@ func (jz *Jzon) Compact() string {
         for _, a := range as { ss = append(ss, a.(string))}
         return "{" + strings.Join(ss, ",") + "}"
 
-	case JzTypeStr: 
+	case JzTypeStr: // FIXME: escaped characters
 		s, _ := jz.String()
 		return "\"" + s + "\""
 
@@ -77,7 +78,8 @@ func (jz *Jzon) Compact() string {
 
 	case JzTypeBol:
 		b, _ := jz.Bool()
-		if b { return "true" } else { return "false" }
+		if b { return "true" } 
+		return "false"
 
 	case JzTypeNul:
 		return "null"

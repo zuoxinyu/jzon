@@ -6,6 +6,7 @@ import (
     "strings"
 )
 
+// Condition tags
 const (
     COND_REGEXP = "regexp:"
     COND_RANGE  = "range:"
@@ -13,12 +14,14 @@ const (
     COND_NULL   = "null:"
 )
 
+// States
 const (
     RANGE_CLOSE int = iota
     RANGE_EXCEPT
     RANGE_ARRAY
 )
 
+// Error levels
 const (
     LEVEL_FETAL int = iota
     LEVEL_EMERGENCY

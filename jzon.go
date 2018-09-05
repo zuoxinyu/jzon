@@ -1,3 +1,8 @@
+// Package jzon implements parsing and encoding  of JSON (Javascript Object Notation)
+// defined in ECMA-404. The most different feature between jzon and encoding/json is
+// that jzon defines a explicit structure to notate a JSON object and supplies some
+// utilities methods to manipulate JSON objects. Pakage jzon is NOT capatible with
+// encoding/json completely. The main goal of jzon is convinence and enhanced tags
 package jzon
 
 import (
@@ -17,12 +22,16 @@ type Jzon struct {
     data Any
 }
 
-// LazyJzon is the lazy version
+// LazyJzon uses a different momory model with structure Jzon.
+// It stores an JSON object with a `Type` field and a pointer
+// which points to the raw JSON bytes for inicating content of
+// this object. Thus, mutable operations is not permitted in this notation.
 type LazyJzon struct {
-	Type  ValueType
+	Type   ValueType
 	slice []byte
 }
 
+// Types
 const (
 	JzTypeStr ValueType = iota
 	JzTypeInt
@@ -32,6 +41,8 @@ const (
 	JzTypeArr
 	JzTypeNul
 )
+
+var debug = false
 
 var typeStrings = []string{
 	"JzTypeStr",

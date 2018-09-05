@@ -2,7 +2,6 @@ package jzon
 
 import (
 	"fmt"
-	"runtime"
 )
 
 type position struct {
@@ -34,9 +33,6 @@ var escapeMap = map[byte]byte{
 	'r':  '\r',
 	't':  '\t',
 }
-
-// isWindows decides that the `\r\n` is indicating one or two new line(s)
-var isWindows = runtime.GOOS == "windows"
 
 // nState indicates the inner state of the `parseNumeric` state machine
 type nState uint64
@@ -130,7 +126,7 @@ func expectCodePoint() error {
 func trimWhiteSpaces(str []byte) []byte {
 	for {
 		switch {
-		case len(str) > 1 && string(str[0:2]) == "\r\n" && isWindows:
+		case len(str) > 1 && str[0] == '\r' && str[1] == '\n':
 			pos.row += 1
 			pos.col = 0
 			str = str[2:]
