@@ -1,8 +1,8 @@
 package jzon
 
 import (
-	"fmt"
-	"reflect"
+    "fmt"
+    "reflect"
 )
 
 // Serializable makes those types which implemented
@@ -17,7 +17,9 @@ type Deserializable interface {
 }
 
 // TAG_NAME is the default leading tag for tagging a structure field
-var TAG_NAME = "jzon"
+var TAG_NAME = "json"
+
+const TAG_VALID = "valid" 
 
 // SetTagName lets users use custom tag name at serializing and deserializing
 func SetTagName(tag string) {
@@ -162,7 +164,7 @@ func Deserialize(json []byte, ptr Any) (err error) {
 	// fmt.Printf("type: %-18s | kind: %-18s\n", t, k)
 
 	if k != reflect.Ptr || v.IsNil() {
-		err = fmt.Errorf("expect nono-nil pointer, but the given value is of kind %s", k)
+		err = fmt.Errorf("expect none-nil pointer, but the given value is of kind %s", k)
 	}
 
 	return deserialize(jz, &v)
@@ -180,6 +182,7 @@ func deserialize(jz *Jzon, v *reflect.Value) (err error) {
 			// t1 := v.Field(i).Type()
 			// k1 := t1.Kind()
 			tag := t.Field(i).Tag.Get(TAG_NAME)
+			//vtag, valid := t.Field(i).Tag.Lookup(TAG_VALID)
 
 			if tag == "," {
 				tag = t.Field(i).Name
@@ -283,11 +286,11 @@ func (jz *Jzon) Value(t ValueType) (v Any, err error) {
 // `*Jzon`, it performs as deep clone, if `v` is of type `Jzon`, it performs as shallow
 // clone, otherwise it converts value of built-in types to an appropriate `Jzon` value
 func NewFromAny(v Any) *Jzon {
-	jz := Jzon{}
+	jz := new(Jzon)
 
 	if v == nil {
 		jz.Type = JzTypeNul
-		return &jz
+		return jz
 	}
 
 	switch v.(type) {
@@ -320,16 +323,20 @@ func NewFromAny(v Any) *Jzon {
 		jz.data = v
 
 	case *Jzon:
-		// TODO: deep clone
-		jz = *(v.(*Jzon))
+        // TODO: shallow clone
+		jz = v.(*Jzon)
 
 	case Jzon:
-		// TODO: shallow clone
-		jz = v.(Jzon)
+        // TODO: deep clone
+		return nil
 
 	default:
-		return nil
+	    var err error
+	    jz, err = Serialize(v)
+	    if err != nil {
+            return nil
+        }
 	}
 
-	return &jz
+	return jz
 }
