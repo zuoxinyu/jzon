@@ -1,8 +1,8 @@
 // Package jzon implements parsing and encoding  of JSON (Javascript Object Notation)
 // defined in ECMA-404. The most different feature between jzon and encoding/json is
 // that jzon defines a explicit structure to notate a JSON object and supplies some
-// utility methods to manipulate JSON objects. Package jzon is NOT capable with the
-// encoding/json completely. The main goal of jzon is convenience and enhanced tags
+// utility methods to manipulate JSON objects. Package jzon is NOT compatible with 
+// encoding/json completely. The main design goal of jzon is enhanced validators.
 package jzon
 
 import (

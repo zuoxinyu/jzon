@@ -103,9 +103,9 @@ func (jz *Jzon) Coloring(file *os.File) {
 }
 
 func (jz *Jzon) render(indent int, step int, useTab bool, useColor bool) string {
-    colorify := func(c string, s string) string { 
+    colorify := func(c string, s string) string {
 		if useColor {
-			return c + s + RESET 
+			return c + s + RESET
 		}
 
 		return s
