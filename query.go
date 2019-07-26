@@ -83,45 +83,45 @@ func parsePath(root *Jzon, path []byte) (curr *Jzon, err error) {
 		switch {
 		case path[0] == '$' && st.match(_Start):
 			ex = []state{_Dot, _LeftSB, _Semicolon}
-            st = _Dollar
+			st = _Dollar
 
-            curr = root
-            path = path[1:]
+			curr = root
+			path = path[1:]
 
 		case path[0] == ';' && st.match(_Dollar, _RightSB, _Key):
 			ex = []state{}
-            st = _Semicolon
+			st = _Semicolon
 
 			return
 
 		case path[0] == '.' && st.match(_Dollar, _Key, _RightSB):
 			ex = []state{_Key}
-            st = _Dot
+			st = _Dot
 
-            path = path[1:]
+			path = path[1:]
 
 		case path[0] == '[' && st.match(_Dollar, _Key):
 			ex = []state{_Index}
-            st = _LeftSB
+			st = _LeftSB
 
-            path = path[1:]
+			path = path[1:]
 
 		case isDigit(path[0]) && st.match(_LeftSB):
-            ex = []state{_RightSB}
-            st = _Index
+			ex = []state{_RightSB}
+			st = _Index
 
-            var n int64
-            var f float64
-            var isInt bool
-            n, f, isInt, path, err = parseNumeric(path)
-            if err != nil {
-                return
-            }
+			var n int64
+			var f float64
+			var isInt bool
+			n, f, isInt, path, err = parseNumeric(path)
+			if err != nil {
+				return
+			}
 
-            if !isInt {
-                err = fmt.Errorf("expect an integer index, but found float: %v", f)
-                return
-            }
+			if !isInt {
+				err = fmt.Errorf("expect an integer index, but found float: %v", f)
+				return
+			}
 
 			curr, err = curr.ValueAt(int(n))
 			if err != nil {
@@ -129,14 +129,14 @@ func parsePath(root *Jzon, path []byte) (curr *Jzon, err error) {
 			}
 
 		case path[0] == ']' && st.match(_Index):
-            ex = []state{_Dot, _Semicolon}
-            st = _RightSB
+			ex = []state{_Dot, _Semicolon}
+			st = _RightSB
 
 			path = path[1:]
 
 		case st.match(_Dot):
-            ex = []state{_Dot, _LeftSB, _Semicolon}
-            st = _Key
+			ex = []state{_Dot, _LeftSB, _Semicolon}
+			st = _Key
 
 			key, path, err = parsePathKey(path)
 			if err != nil {

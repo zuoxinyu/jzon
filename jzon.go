@@ -1,7 +1,7 @@
 // Package jzon implements parsing and encoding  of JSON (Javascript Object Notation)
 // defined in ECMA-404. The most different feature between jzon and encoding/json is
 // that jzon defines a explicit structure to notate a JSON object and supplies some
-// utility methods to manipulate JSON objects. Package jzon is NOT compatible with 
+// utility methods to manipulate JSON objects. Package jzon is NOT compatible with
 // encoding/json completely. The main design goal of jzon is enhanced validators.
 package jzon
 
@@ -19,7 +19,7 @@ type Any = interface{}
 // Jzon defines a JSON node
 type Jzon struct {
 	Type ValueType
-    data Any
+	data Any
 }
 
 // LazyJzon uses a different memory model with structure Jzon.
@@ -27,7 +27,7 @@ type Jzon struct {
 // which points to the raw JSON bytes for indicating content of
 // this object. Thus, mutable operations is not permitted in this notation.
 type LazyJzon struct {
-	Type   ValueType
+	Type  ValueType
 	slice []byte
 }
 

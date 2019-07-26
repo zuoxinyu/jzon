@@ -1,32 +1,32 @@
 package jzon
 
 import (
-    "fmt"
-    "regexp"
-    "strings"
+	"fmt"
+	"regexp"
+	"strings"
 )
 
 // Condition tags
 const (
-    COND_REGEXP = "regexp:"
-    COND_RANGE  = "range:"
-    COND_BOOL   = "bool:"
-    COND_NULL   = "null:"
+	COND_REGEXP = "regexp:"
+	COND_RANGE  = "range:"
+	COND_BOOL   = "bool:"
+	COND_NULL   = "null:"
 )
 
 // States
 const (
-    RANGE_CLOSE int = iota
-    RANGE_EXCEPT
-    RANGE_ARRAY
+	RANGE_CLOSE int = iota
+	RANGE_EXCEPT
+	RANGE_ARRAY
 )
 
 // Error levels
 const (
-    LEVEL_FETAL int = iota
-    LEVEL_EMERGENCY
-    LEVEL_EXCEPTION
-    LEVEL_LOWEST
+	LEVEL_FETAL int = iota
+	LEVEL_EMERGENCY
+	LEVEL_EXCEPTION
+	LEVEL_LOWEST
 )
 
 // Validator defines a validator to validate if a JSON value can be acceptable
@@ -40,28 +40,28 @@ type Validator func(*Jzon) bool
 // for RANGE_ARRAY:
 // 		array.Contains(target)
 type Range struct {
-    Type       int
-    UpperBound int64
-    LowerBound int64
-    Array      []int64
+	Type       int
+	UpperBound int64
+	LowerBound int64
+	Array      []int64
 }
 
 // CanAccept judges whether the target number should be accepted
 func (rng *Range) CanAccept(n int64) bool {
-    switch rng.Type{
-    case RANGE_CLOSE:
-        return rng.LowerBound <= n && n < rng.UpperBound
-    case RANGE_EXCEPT:
-        return n < rng.LowerBound || rng.UpperBound < n
-    case RANGE_ARRAY:
-        for _, v := range rng.Array {
-            if v == n {
-                return true
-            }
-        }
-        return false
-    }
-    return false
+	switch rng.Type {
+	case RANGE_CLOSE:
+		return rng.LowerBound <= n && n < rng.UpperBound
+	case RANGE_EXCEPT:
+		return n < rng.LowerBound || rng.UpperBound < n
+	case RANGE_ARRAY:
+		for _, v := range rng.Array {
+			if v == n {
+				return true
+			}
+		}
+		return false
+	}
+	return false
 }
 
 /*
@@ -75,92 +75,92 @@ sample:
 */
 
 func compileCondition(cond string) (fn Validator, err error) {
-    switch {
-    case strings.HasPrefix(cond, COND_REGEXP) :
-        return compileRegExp(cond)
+	switch {
+	case strings.HasPrefix(cond, COND_REGEXP):
+		return compileRegExp(cond)
 
-    case strings.HasPrefix(cond, COND_RANGE):
-        return compileRange(cond)
+	case strings.HasPrefix(cond, COND_RANGE):
+		return compileRange(cond)
 
-    case strings.HasPrefix(cond, COND_BOOL):
-        return compileBool(cond)
+	case strings.HasPrefix(cond, COND_BOOL):
+		return compileBool(cond)
 
-    case strings.HasPrefix(cond, COND_NULL):
-        return compileNull(cond)
-    }
+	case strings.HasPrefix(cond, COND_NULL):
+		return compileNull(cond)
+	}
 
-    return nil, fmt.Errorf("expect a string with prefix `%s` | `%s` | `%s` | `%s` but found `%s`",
-        COND_REGEXP, COND_BOOL, COND_NULL, COND_RANGE, cond)
+	return nil, fmt.Errorf("expect a string with prefix `%s` | `%s` | `%s` | `%s` but found `%s`",
+		COND_REGEXP, COND_BOOL, COND_NULL, COND_RANGE, cond)
 }
 
 func compileRegExp(cond string) (fn Validator, err error) {
-    reg, err := regexp.Compile(strings.TrimPrefix(cond, COND_REGEXP))
-    if err != nil {
-        return nil, err
-    }
+	reg, err := regexp.Compile(strings.TrimPrefix(cond, COND_REGEXP))
+	if err != nil {
+		return nil, err
+	}
 
-    return func(jz *Jzon) bool {
-        str, err := jz.String()
-        if err != nil {
-            return false
-        }
-        return reg.Match([]byte(str))
-    }, nil
+	return func(jz *Jzon) bool {
+		str, err := jz.String()
+		if err != nil {
+			return false
+		}
+		return reg.Match([]byte(str))
+	}, nil
 }
 
 func compileRange(cond string) (fn Validator, err error) {
-    var rng Range
-    rangeStr := strings.TrimPrefix(cond, COND_RANGE)
-    nParsed, err := fmt.Sscanf(rangeStr, "%d,%d", &rng.LowerBound, &rng.UpperBound)
-    if err != nil {
-        return nil, err
-    }
+	var rng Range
+	rangeStr := strings.TrimPrefix(cond, COND_RANGE)
+	nParsed, err := fmt.Sscanf(rangeStr, "%d,%d", &rng.LowerBound, &rng.UpperBound)
+	if err != nil {
+		return nil, err
+	}
 
-    if nParsed != 2 {
-        return nil, fmt.Errorf("expect 2 range numbers, but found %d", nParsed)
-    }
+	if nParsed != 2 {
+		return nil, fmt.Errorf("expect 2 range numbers, but found %d", nParsed)
+	}
 
-    return func(jz *Jzon) bool {
-        var n int64
-        if n, err = jz.Integer(); err != nil {
-            return false
-        }
-        return rng.CanAccept(n)
-    }, nil
+	return func(jz *Jzon) bool {
+		var n int64
+		if n, err = jz.Integer(); err != nil {
+			return false
+		}
+		return rng.CanAccept(n)
+	}, nil
 }
 
 func compileBool(cond string) (fn Validator, err error) {
-    boolStr := strings.TrimPrefix(cond, COND_BOOL)
-    var b bool
-    if boolStr == "true" {
-        b = true
-    } else if boolStr == "false" {
-        b = false
-    } else if boolStr == "both" {
-        return func(jz *Jzon) bool {
-            return jz.Type == JzTypeBol
-        }, nil
-    } else {
-        return nil, fmt.Errorf("expect `true` | `fasle` | `both` but found `%s`", boolStr)
-    }
+	boolStr := strings.TrimPrefix(cond, COND_BOOL)
+	var b bool
+	if boolStr == "true" {
+		b = true
+	} else if boolStr == "false" {
+		b = false
+	} else if boolStr == "both" {
+		return func(jz *Jzon) bool {
+			return jz.Type == JzTypeBol
+		}, nil
+	} else {
+		return nil, fmt.Errorf("expect `true` | `fasle` | `both` but found `%s`", boolStr)
+	}
 
-    return func(jz *Jzon) bool {
-        v, err := jz.Bool()
-        if err != nil {
-            return false
-        }
-        return v == b
-    }, nil
+	return func(jz *Jzon) bool {
+		v, err := jz.Bool()
+		if err != nil {
+			return false
+		}
+		return v == b
+	}, nil
 }
 
 func compileNull(cond string) (fn Validator, err error) {
-    nullStr := strings.TrimPrefix(cond, COND_NULL)
-    if nullStr == "null" {
-        return func(jz *Jzon) bool {
-            return jz.Type == JzTypeNul
-        }, nil
-    }
-    return nil, expectString("null", []byte(nullStr))
+	nullStr := strings.TrimPrefix(cond, COND_NULL)
+	if nullStr == "null" {
+		return func(jz *Jzon) bool {
+			return jz.Type == JzTypeNul
+		}, nil
+	}
+	return nil, expectString("null", []byte(nullStr))
 }
 
 // Validate verifies this node by another JSON which has a particular grammar,
@@ -168,6 +168,6 @@ func compileNull(cond string) (fn Validator, err error) {
 // level number. If there were any fields can't pass the relying validators,
 // `Validate` would generate detailed report into another JSON respectively
 func (jz *Jzon) Validate(validator *Jzon) (ok bool, report *Jzon, err error) {
-    // TODO:
-    return
+	// TODO:
+	return
 }

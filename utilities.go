@@ -8,20 +8,20 @@ import (
 
 // *nix TTY colors
 const (
-    BLACK     = "\033[0;30m"
-    RED       = "\033[0;31m"
-    GREEN     = "\033[0;32m"
-    YELLOW    = "\033[0;33m"
-    BLUE      = "\033[0;34m"
-    PURPLE    = "\033[0;35m"
-    SKY       = "\033[0;36m"
-    WHITE     = "\033[0;37m"
-    RESET     = "\033[0m"
-    HIGHLIGHT = "\033[1m"
-    UNDERLINE = "\033[4m"
-    BLINK     = "\033[5m"
-    REVERSE   = "\033[7m"
-    FADEOUT   = "\033[8m"
+	BLACK     = "\033[0;30m"
+	RED       = "\033[0;31m"
+	GREEN     = "\033[0;32m"
+	YELLOW    = "\033[0;33m"
+	BLUE      = "\033[0;34m"
+	PURPLE    = "\033[0;35m"
+	SKY       = "\033[0;36m"
+	WHITE     = "\033[0;37m"
+	RESET     = "\033[0m"
+	HIGHLIGHT = "\033[1m"
+	UNDERLINE = "\033[4m"
+	BLINK     = "\033[5m"
+	REVERSE   = "\033[7m"
+	FADEOUT   = "\033[8m"
 )
 
 // Format converts raw compact JSON to human-reading text
@@ -53,16 +53,20 @@ func (jz *Jzon) Format(indent int, step int) string {
 func (jz *Jzon) Compact() string {
 	switch jz.Type {
 	case JzTypeArr:
-	    var ss []string
+		var ss []string
 		as, _ := jz.AMap(func(v *Jzon) Any { return v.Compact() })
-		for _, a := range as { ss = append(ss, a.(string))}
+		for _, a := range as {
+			ss = append(ss, a.(string))
+		}
 		return "[" + strings.Join(ss, ",") + "]"
 
 	case JzTypeObj:
-        var ss []string
+		var ss []string
 		as, _ := jz.OMap(func(k string, v *Jzon) Any { return "\"" + k + "\"" + ":" + v.Compact() })
-        for _, a := range as { ss = append(ss, a.(string))}
-        return "{" + strings.Join(ss, ",") + "}"
+		for _, a := range as {
+			ss = append(ss, a.(string))
+		}
+		return "{" + strings.Join(ss, ",") + "}"
 
 	case JzTypeStr: // FIXME: escaped characters
 		s, _ := jz.String()
@@ -78,7 +82,9 @@ func (jz *Jzon) Compact() string {
 
 	case JzTypeBol:
 		b, _ := jz.Bool()
-		if b { return "true" } 
+		if b {
+			return "true"
+		}
 		return "false"
 
 	case JzTypeNul:
@@ -89,21 +95,21 @@ func (jz *Jzon) Compact() string {
 
 // Print prints human-reading JSON text to writer
 func (jz *Jzon) Print() {
-    fmt.Print(jz.Compact())
+	fmt.Print(jz.Compact())
 }
 
 // Coloring prints colored and formatted JSON text on the terminal. if it's not
 // a terminal or doesn't support colors, it just prints raw but formatted text
 func (jz *Jzon) Coloring(file *os.File) {
-    if file != os.Stdout {
-        fmt.Fprint(file, jz.Format(0, 2))
-    }
+	if file != os.Stdout {
+		fmt.Fprint(file, jz.Format(0, 2))
+	}
 
-    fmt.Fprint(file, jz.render(0, 2, false, true))
+	fmt.Fprint(file, jz.render(0, 2, false, true))
 }
 
 func (jz *Jzon) render(indent int, step int, useTab bool, useColor bool) string {
-    colorify := func(c string, s string) string {
+	colorify := func(c string, s string) string {
 		if useColor {
 			return c + s + RESET
 		}
@@ -113,7 +119,7 @@ func (jz *Jzon) render(indent int, step int, useTab bool, useColor bool) string 
 
 	indentf := func(i, s int) string {
 		if useTab {
-			return strings.Repeat("\t", i / s)
+			return strings.Repeat("\t", i/s)
 		}
 
 		return strings.Repeat(" ", i)
@@ -122,8 +128,10 @@ func (jz *Jzon) render(indent int, step int, useTab bool, useColor bool) string 
 	switch jz.Type {
 	case JzTypeArr:
 		var ss []string
-		vs, _ := jz.AMap(func(v *Jzon) Any { return v.render(indent + step, step, useTab, useColor) })
-		for _, v := range vs { ss = append(ss, v.(string)) }
+		vs, _ := jz.AMap(func(v *Jzon) Any { return v.render(indent+step, step, useTab, useColor) })
+		for _, v := range vs {
+			ss = append(ss, v.(string))
+		}
 		return "[" + strings.Join(ss, ", ") + "]"
 
 	case JzTypeObj:
@@ -131,23 +139,27 @@ func (jz *Jzon) render(indent int, step int, useTab bool, useColor bool) string 
 			return "{}"
 		}
 
-		vs, _ := jz.OMap(func(k string, v *Jzon) Any { return indentf(indent + step, step) + YELLOW + "\""+ k + "\": " + RESET + v.render(indent + step, step, useTab, useColor) })
+		vs, _ := jz.OMap(func(k string, v *Jzon) Any {
+			return indentf(indent+step, step) + YELLOW + "\"" + k + "\": " + RESET + v.render(indent+step, step, useTab, useColor)
+		})
 		var ss []string
-		for _, v := range vs { ss = append(ss, v.(string)) }
+		for _, v := range vs {
+			ss = append(ss, v.(string))
+		}
 		return "{\n" + strings.Join(ss, ",\n") + "\n" + indentf(indent, step) + "}"
 
-    case JzTypeNul:
-        return colorify(RED, jz.Compact())
+	case JzTypeNul:
+		return colorify(RED, jz.Compact())
 
-    case JzTypeBol:
-        return colorify(GREEN, jz.Compact())
+	case JzTypeBol:
+		return colorify(GREEN, jz.Compact())
 
-    case JzTypeFlt, JzTypeInt:
-        return colorify(BLUE, jz.Compact())
+	case JzTypeFlt, JzTypeInt:
+		return colorify(BLUE, jz.Compact())
 
-    case JzTypeStr:
-        return colorify(PURPLE, jz.Compact())
+	case JzTypeStr:
+		return colorify(PURPLE, jz.Compact())
 	}
 
-    return ""
+	return ""
 }

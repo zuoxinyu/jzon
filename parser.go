@@ -39,15 +39,15 @@ type nState uint64
 
 const (
 	_nStart    nState = 2 << iota
-	_nZero      // 0
-	_nDot       // .
-	_nDigit0    // 0-9 after _nNoneZero
-	_nDigit1    // 0-9 after _nDot
-	_nDigit2    // 0-9 after _nExp or _nPlus or _Minus
-    _nNoneZero  // 1-9
-	_nExp       // e E
-	_nPlus      // +
-	_nMinus     // -
+	_nZero            // 0
+	_nDot             // .
+	_nDigit0          // 0-9 after _nNoneZero
+	_nDigit1          // 0-9 after _nDot
+	_nDigit2          // 0-9 after _nExp or _nPlus or _Minus
+	_nNoneZero        // 1-9
+	_nExp             // e E
+	_nPlus            // +
+	_nMinus           // -
 )
 
 var nTypeStrings = map[nState]string{
@@ -99,7 +99,9 @@ func expect(c uint8, found uint8) error {
 
 func expectNState(st nState, ex []nState) error {
 	ss := make([]string, 4)
-	for _, s := range ex { ss = append(ss, nTypeStrings[s]) }
+	for _, s := range ex {
+		ss = append(ss, nTypeStrings[s])
+	}
 	return fmt.Errorf("expect state = %s, but the real is %s", ss, nTypeStrings[st])
 }
 
@@ -175,95 +177,76 @@ func parse(json []byte) (jz *Jzon, rem []byte, err error) {
 
 func parseObj(json []byte) (obj *Jzon, rem []byte, err error) {
 	obj = New(JzTypeObj)
+	obj.data = make(map[string]*Jzon)
 	var k string
 	var v *Jzon
-	var m = make(map[string]*Jzon)
-	defer func() {
-	    obj.data = m
-    }()
-
-	// return empty object directly
-	var oldPos = pos
-	trimmed := trimWhiteSpaces(json[1:])
-	if trimmed[0] == '}' {
-		pos.col++
-		return obj, trimmed[1:], nil
-	}
-	// recover
-	pos = oldPos
-	rem = json
 
 	for {
-		pos.col++
-		k, v, rem, err = parseKVPair(rem[1:])
-		if err != nil {
+		switch rem[0] {
+		case ',':
+			if len(obj.data.(map[string]*Jzon)) == 0 {
+				err = expectOneOf("}\"", rem[0])
+				return
+			}
+			pos.col++
+			rem = rem[1:]
+			continue
+		case ' ', '\t':
+			pos.col++
+			rem = rem[1:]
+			continue
+		case '\n', '\r':
+			pos.row++
+			rem = rem[1:]
+			continue
+		case '}':
+			rem = rem[1:]
 			return
-		}
-
-		m[k] = v
-
-		rem = trimWhiteSpaces(rem)
-		if rem[0] == ',' {
+		default:
+			k, v, rem, err = parseKVPair(rem[1:])
+			if err != nil {
+				return
+			}
+			obj.data.(map[string]*Jzon)[k] = v
 			continue
 		}
-
-		break
 	}
-
-	rem = trimWhiteSpaces(rem)
-	if rem[0] != '}' {
-		err = expectOneOf("},", rem[0])
-		return
-	}
-
-	pos.col++
-	return obj, rem[1:], nil
 }
 
 func parseArr(json []byte) (arr *Jzon, rem []byte, err error) {
 	arr = New(JzTypeArr)
+	arr.data = make([]*Jzon, 0)
 	var v *Jzon
-	var slice = make([]*Jzon, 0)
-	defer func() {
-	    arr.data = slice
-    }()
-
-	// return empty array directly
-	var oldPos = pos
-	trimmed := trimWhiteSpaces(json[1:])
-	if trimmed[0] == ']' {
-		pos.col++
-		return arr, trimmed[1:], nil
-	}
-	// recover
-	pos = oldPos
-	rem = json
-
 	for {
-		pos.col++
-		v, rem, err = parse(rem[1:])
-		if err != nil {
+		switch rem[0] {
+		case ',':
+			if len(arr.data.([]*Jzon)) == 0 {
+				err = expectOneOf("{[\"-1234567890ftn", rem[0])
+				return
+			}
+			pos.col++
+			rem = rem[1:]
+			continue
+		case ' ', '\t':
+			pos.col++
+			rem = rem[1:]
+			continue
+		case '\n', '\r':
+			pos.row++
+			rem = rem[1:]
+			continue
+		case ']':
+			rem = rem[1:]
 			return
-		}
-
-		slice = append(slice, v)
-
-		rem = trimWhiteSpaces(rem)
-		if rem[0] == ',' {
+		default:
+			v, rem, err = parse(rem[1:])
+			if err != nil {
+				return
+			}
+			arr.data = append(arr.data.([]*Jzon), v)
 			continue
 		}
-
-		break
 	}
-
-	rem = trimWhiteSpaces(rem)
-	if rem[0] != ']' {
-		err = expectOneOf("],", rem[0])
-		return
-	}
-
-	pos.col++
-	return arr, rem[1:], nil
 }
 
 func parseStr(json []byte) (str *Jzon, rem []byte, err error) {
@@ -288,7 +271,7 @@ func parseNum(json []byte) (num *Jzon, rem []byte, err error) {
 
 	if isInt {
 		num.Type = JzTypeInt
-		num.data= n
+		num.data = n
 	} else {
 		num.Type = JzTypeFlt
 		num.data = f
@@ -333,30 +316,25 @@ func parseNul(json []byte) (nul *Jzon, rem []byte, err error) {
 }
 
 func parseKVPair(json []byte) (k string, v *Jzon, rem []byte, err error) {
-	json = trimWhiteSpaces(json)
-
-	if json[0] == '"' {
-		k, rem, err = parseKey(json)
-		if err != nil {
-			return
-		}
-
-		rem = trimWhiteSpaces(rem)
-		if rem[0] != ':' {
-			err = expect(':', rem[0])
-			return
-		}
-
-		pos.col++
-		v, rem, err = parse(rem[1:])
-		if err != nil {
-			return
-		}
-
+	if json[0] != '"' {
+		err = expect('"', json[0])
 		return
 	}
 
-	err = expect('"', json[0])
+	k, rem, err = parseKey(json)
+	if err != nil {
+		return
+	}
+
+	rem = trimWhiteSpaces(rem)
+	if rem[0] != ':' {
+		err = expect(':', rem[0])
+		return
+	}
+
+	pos.col++
+	v, rem, err = parse(rem[1:])
+
 	return
 }
 
@@ -474,10 +452,14 @@ func parseUnicode(json []byte) (parsed []byte, rem []byte, err error) {
 
 	var nBytes int
 	switch {
-	case uc < 0x80:    nBytes = 1
-	case uc < 0x800:   nBytes = 2
-	case uc < 0x10000: nBytes = 3
-	default:           nBytes = 4
+	case uc < 0x80:
+		nBytes = 1
+	case uc < 0x800:
+		nBytes = 2
+	case uc < 0x10000:
+		nBytes = 3
+	default:
+		nBytes = 4
 	}
 
 	parsed = []byte{0, 0, 0, 0}
@@ -488,10 +470,20 @@ func parseUnicode(json []byte) (parsed []byte, rem []byte, err error) {
 	// `c | firstByteMarkMap[n]`:set the highest n-1 bytes to 1
 
 	switch nBytes {
-	case 4: parsed[3] = byte((uc | 0x80) & 0xBF); uc >>= 6; fallthrough
-	case 3: parsed[2] = byte((uc | 0x80) & 0xBF); uc >>= 6; fallthrough
-	case 2: parsed[1] = byte((uc | 0x80) & 0xBF); uc >>= 6; fallthrough
-	case 1: parsed[0] = byte( uc | firstByteMarkMap[nBytes])
+	case 4:
+		parsed[3] = byte((uc | 0x80) & 0xBF)
+		uc >>= 6
+		fallthrough
+	case 3:
+		parsed[2] = byte((uc | 0x80) & 0xBF)
+		uc >>= 6
+		fallthrough
+	case 2:
+		parsed[1] = byte((uc | 0x80) & 0xBF)
+		uc >>= 6
+		fallthrough
+	case 1:
+		parsed[0] = byte(uc | firstByteMarkMap[nBytes])
 	}
 
 	var realParsed []byte
@@ -510,10 +502,14 @@ func parseHex4(json []byte) (hex uint32, rem []byte, err error) {
 		hc := uint32(0)
 		ex := uint32(0x1000 >> (i * 4))
 		switch {
-		case '0' <= rem[i] && rem[i] <= '9': hc = uint32( 0 + rem[i] - '0')
-		case 'A' <= rem[i] && rem[i] <= 'F': hc = uint32(10 + rem[i] - 'A')
-		case 'a' <= rem[i] && rem[i] <= 'f': hc = uint32(10 + rem[i] - 'a')
-		default: return hex, nil, expectOneOf("0123456789ABCDEF", rem[i])
+		case '0' <= rem[i] && rem[i] <= '9':
+			hc = uint32(0 + rem[i] - '0')
+		case 'A' <= rem[i] && rem[i] <= 'F':
+			hc = uint32(10 + rem[i] - 'A')
+		case 'a' <= rem[i] && rem[i] <= 'f':
+			hc = uint32(10 + rem[i] - 'a')
+		default:
+			return hex, nil, expectOneOf("0123456789ABCDEF", rem[i])
 		}
 
 		hex += hc * ex
@@ -548,7 +544,11 @@ func parseNumeric(json []byte) (n int64, f float64, isInt bool, rem []byte, err 
 	for {
 		switch {
 		case len(rem) == 0: // Must be the first condition, avoiding illegal memory access
-			if isInt { f = 0 } else { n = 0 }
+			if isInt {
+				f = 0
+			} else {
+				n = 0
+			}
 			return
 
 		case rem[0] == '0' && st.match(_nStart):
@@ -639,7 +639,11 @@ func parseNumeric(json []byte) (n int64, f float64, isInt bool, rem []byte, err 
 			pos.col++
 
 		case !isNumericChar(rem[0]) && st.match(_nZero, _nNoneZero, _nDigit0, _nDigit1, _nDigit2):
-			if isInt { f = 0 } else { n = 0 }
+			if isInt {
+				f = 0
+			} else {
+				n = 0
+			}
 			return
 
 		default:

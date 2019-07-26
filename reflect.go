@@ -1,8 +1,8 @@
 package jzon
 
 import (
-    "fmt"
-    "reflect"
+	"fmt"
+	"reflect"
 )
 
 // Serializable makes those types which implemented
@@ -19,7 +19,7 @@ type Deserializable interface {
 // TAG_NAME is the default leading tag for tagging a structure field
 var TAG_NAME = "json"
 
-const TAG_VALID = "valid" 
+const TAG_VALID = "valid"
 
 // SetTagName lets users use custom tag name at serializing and deserializing
 func SetTagName(tag string) {
@@ -323,19 +323,19 @@ func NewFromAny(v Any) *Jzon {
 		jz.data = v
 
 	case *Jzon:
-        // TODO: shallow clone
+		// TODO: shallow clone
 		jz = v.(*Jzon)
 
 	case Jzon:
-        // TODO: deep clone
+		// TODO: deep clone
 		return nil
 
 	default:
-	    var err error
-	    jz, err = Serialize(v)
-	    if err != nil {
-            return nil
-        }
+		var err error
+		jz, err = Serialize(v)
+		if err != nil {
+			return nil
+		}
 	}
 
 	return jz
