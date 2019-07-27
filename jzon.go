@@ -22,15 +22,6 @@ type Jzon struct {
 	data Any
 }
 
-// LazyJzon uses a different memory model with structure Jzon.
-// It stores an JSON object with a `Type` field and a pointer
-// which points to the raw JSON bytes for indicating content of
-// this object. Thus, mutable operations is not permitted in this notation.
-type LazyJzon struct {
-	Type  ValueType
-	slice []byte
-}
-
 // Types
 const (
 	JzTypeStr ValueType = iota
