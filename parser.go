@@ -197,12 +197,10 @@ func parseObj(json []byte) (obj *Jzon, rem []byte, err error) {
 			rem = rem[1:]
 			continue
 		case ' ', '\t':
-			extraComma = false
 			pos.col++
 			rem = rem[1:]
 			continue
 		case '\n', '\r':
-			extraComma = false
 			pos.row++
 			rem = rem[1:]
 			continue
@@ -247,12 +245,10 @@ func parseArr(json []byte) (arr *Jzon, rem []byte, err error) {
 			rem = rem[1:]
 			continue
 		case ' ', '\t':
-			extraComma = false
 			pos.col++
 			rem = rem[1:]
 			continue
 		case '\n', '\r':
-			extraComma = false
 			pos.row++
 			rem = rem[1:]
 			continue
@@ -581,18 +577,11 @@ func parseNumeric(json []byte) (n int64, f float64, isInt bool, rem []byte, err 
 			ex = []nState{_nDot, _nExp}
 			st = _nZero
 
-			f = 0
-			n = 0
-			rem = rem[1:]
-			pos.col++
-
 		case rem[0] == '.' && st.match(_nZero, _nDigit0, _nNoneZero):
 			ex = []nState{_nDigit1}
 			st = _nDot
 
 			isInt = false
-			rem = rem[1:]
-			pos.col++
 
 		case isDigit(rem[0]) && st.match(_nDot, _nDigit1):
 			ex = []nState{_nDigit1, _nExp}
@@ -600,8 +589,6 @@ func parseNumeric(json []byte) (n int64, f float64, isInt bool, rem []byte, err 
 
 			nAfterDot *= 10
 			f += float64(float64(rem[0]-'0') / nAfterDot)
-			rem = rem[1:]
-			pos.col++
 
 		case isNoneZero(rem[0]) && st.match(_nStart):
 			ex = []nState{_nDot, _nDigit0, _nExp}
@@ -609,8 +596,6 @@ func parseNumeric(json []byte) (n int64, f float64, isInt bool, rem []byte, err 
 
 			n = int64(rem[0] - '0')
 			f = float64(rem[0] - '0')
-			rem = rem[1:]
-			pos.col++
 
 		case isDigit(rem[0]) && st.match(_nDigit0, _nNoneZero):
 			ex = []nState{_nDigit0, _nExp, _nDot}
@@ -618,8 +603,6 @@ func parseNumeric(json []byte) (n int64, f float64, isInt bool, rem []byte, err 
 
 			n = n*10 + int64(rem[0]-'0')
 			f = f*10 + float64(rem[0]-'0')
-			rem = rem[1:]
-			pos.col++
 
 		case (rem[0] == 'e' || rem[0] == 'E') && st.match(_nZero, _nNoneZero, _nDigit0, _nDigit1):
 			ex = []nState{_nPlus, _nMinus, _nDigit2}
@@ -627,24 +610,18 @@ func parseNumeric(json []byte) (n int64, f float64, isInt bool, rem []byte, err 
 
 			isInt = false
 			metExpPlus = true
-			rem = rem[1:]
-			pos.col++
 
 		case rem[0] == '+' && st.match(_nExp):
 			ex = []nState{_nDigit2}
 			st = _nPlus
 
 			metExpPlus = true
-			rem = rem[1:]
-			pos.col++
 
 		case rem[0] == '-' && st.match(_nExp):
 			ex = []nState{_nDigit2}
 			st = _nMinus
 
 			metExpPlus = false
-			rem = rem[1:]
-			pos.col++
 
 		case isDigit(rem[0]) && st.match(_nExp, _nPlus, _nMinus, _nDigit2):
 			ex = []nState{_nDigit2}
@@ -660,9 +637,6 @@ func parseNumeric(json []byte) (n int64, f float64, isInt bool, rem []byte, err 
 					f /= 10
 				}
 			}
-
-			rem = rem[1:]
-			pos.col++
 
 		case !isNumericChar(rem[0]) && st.match(_nZero, _nNoneZero, _nDigit0, _nDigit1, _nDigit2):
 			if isInt {
@@ -681,5 +655,8 @@ func parseNumeric(json []byte) (n int64, f float64, isInt bool, rem []byte, err 
 
 			return
 		}
+		rem = rem[1:]
+		pos.col++
+
 	}
 }
