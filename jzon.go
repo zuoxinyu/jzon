@@ -85,8 +85,16 @@ func Parse(json []byte) (jz *Jzon, err error) {
 
 	pos.col = 0
 	pos.row = 0
-	jz, _, err = parse(json)
-	return jz, err
+	jz, rem, err := parse(json)
+	if len(rem) == 0 {
+		return jz, err
+	}
+
+	rem = trimWhiteSpaces(rem)
+	if len(rem) == 0 {
+		return jz, err
+	}
+	return nil, expectString("end of file", rem)
 }
 
 // Object returns object value, if it's not an object, an error will be thrown out

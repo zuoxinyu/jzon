@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"strconv"
-	"testing"
 	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"testing"
 )
 
 const deepJSON = `
@@ -69,30 +71,64 @@ func TestParse(t *testing.T) {
 		t.Error(err)
 	}
 
-	content, err := ioutil.ReadFile("../data/twitter.json")
-	if err != nil {
-		t.Error(err)
+	parseFile := func(path string) error {
+		content, err := ioutil.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		_, err = Parse(content)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
-	_, err = Parse(content)
-	if err != nil {
-		t.Error(err)
-	}
-	content, err = ioutil.ReadFile("../data/getInfo.json")
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = Parse(content)
-	if err != nil {
-		t.Error(err)
-	}
-	content, err = ioutil.ReadFile("../data/loginInfo.json")
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = Parse(content)
-	if err != nil {
-		t.Error(err)
-	}
+
+	filepath.Walk("data/roundtrip", func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != ".json" {
+			return nil
+		}
+		fmt.Print(path)
+		err = parseFile(path)
+		if err != nil {
+			t.Errorf("fail on file: %v", path)
+		}
+		fmt.Print("\tpassed\n")
+		return nil
+	})
+
+	filepath.Walk("data/jsonchecker", func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != ".json" {
+			return nil
+		}
+		base := filepath.Base(path)
+
+		if strings.HasPrefix(base, "pass") {
+			fmt.Print(base)
+			err = parseFile(path)
+			if err != nil {
+				fmt.Print("\tfailed\n")
+			} else {
+				fmt.Print("\tpassed\n")
+			}
+		}
+
+		if strings.HasPrefix(base, "fail") {
+			fmt.Print(base)
+			err = parseFile(path)
+			if err == nil {
+				fmt.Print("\tfailed\n")
+			} else {
+				fmt.Print("\tpassed\n")
+			}
+		}
+		return nil
+	})
 }
 
 func TestParseObj(t *testing.T) {
@@ -544,13 +580,12 @@ func TestDeserialize(t *testing.T) {
 		t.Error(err)
 	}
 	fmt.Printf("%#v\n", user)
-
 }
 
 // Benchmarks
 
-func BenchmarkJzonParse(b *testing.B) {
-	content, err := ioutil.ReadFile("../data/twitter.json")
+func BenchmarkJzonParseTwitter(b *testing.B) {
+	content, err := ioutil.ReadFile("data/twitter.json")
 	if err != nil {
 		b.Error(err)
 	}
@@ -562,8 +597,62 @@ func BenchmarkJzonParse(b *testing.B) {
 	b.ReportAllocs()
 }
 
-func BenchmarkJsonParse(b *testing.B) {
-	content, err := ioutil.ReadFile("../data/twitter.json")
+func BenchmarkJzonParseCanada(b *testing.B) {
+	content, err := ioutil.ReadFile("data/canada.json")
+	if err != nil {
+		b.Error(err)
+	}
+	b.ResetTimer()
+	b.SetBytes(0)
+	for i := 0; i < b.N; i++ {
+		Parse(content)
+	}
+	b.ReportAllocs()
+}
+
+func BenchmarkJzonParseCatalog(b *testing.B) {
+	content, err := ioutil.ReadFile("data/citm_catalog.json")
+	if err != nil {
+		b.Error(err)
+	}
+	b.ResetTimer()
+	b.SetBytes(0)
+	for i := 0; i < b.N; i++ {
+		Parse(content)
+	}
+	b.ReportAllocs()
+}
+
+func BenchmarkJsonParseTwitter(b *testing.B) {
+	content, err := ioutil.ReadFile("data/twitter.json")
+	if err != nil {
+		b.Error(err)
+	}
+	var m map[string]interface{}
+	b.ResetTimer()
+	b.SetBytes(0)
+	for i := 0; i < b.N; i++ {
+		json.Unmarshal(content, &m)
+	}
+	b.ReportAllocs()
+}
+
+func BenchmarkJsonParseCanada(b *testing.B) {
+	content, err := ioutil.ReadFile("data/canada.json")
+	if err != nil {
+		b.Error(err)
+	}
+	var m map[string]interface{}
+	b.ResetTimer()
+	b.SetBytes(0)
+	for i := 0; i < b.N; i++ {
+		json.Unmarshal(content, &m)
+	}
+	b.ReportAllocs()
+}
+
+func BenchmarkJsonParseCatalog(b *testing.B) {
+	content, err := ioutil.ReadFile("data/citm_catalog.json")
 	if err != nil {
 		b.Error(err)
 	}

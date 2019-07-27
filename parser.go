@@ -180,6 +180,10 @@ func parseObj(json []byte) (obj *Jzon, rem []byte, err error) {
 	obj.data = make(map[string]*Jzon)
 	var k string
 	var v *Jzon
+	var extraComma bool
+
+	rem = json[1:]
+	pos.col++
 
 	for {
 		switch rem[0] {
@@ -188,22 +192,31 @@ func parseObj(json []byte) (obj *Jzon, rem []byte, err error) {
 				err = expectOneOf("}\"", rem[0])
 				return
 			}
+			extraComma = true
 			pos.col++
 			rem = rem[1:]
 			continue
 		case ' ', '\t':
+			extraComma = false
 			pos.col++
 			rem = rem[1:]
 			continue
 		case '\n', '\r':
+			extraComma = false
 			pos.row++
 			rem = rem[1:]
 			continue
 		case '}':
+			if extraComma {
+				err = expectString("value", rem)
+				return 
+			}
+			pos.col++
 			rem = rem[1:]
 			return
 		default:
-			k, v, rem, err = parseKVPair(rem[1:])
+			extraComma = false
+			k, v, rem, err = parseKVPair(rem)
 			if err != nil {
 				return
 			}
@@ -217,6 +230,11 @@ func parseArr(json []byte) (arr *Jzon, rem []byte, err error) {
 	arr = New(JzTypeArr)
 	arr.data = make([]*Jzon, 0)
 	var v *Jzon
+	var extraComma bool // TODO: add extension option 
+
+	rem = json[1:]
+	pos.col++
+
 	for {
 		switch rem[0] {
 		case ',':
@@ -224,22 +242,31 @@ func parseArr(json []byte) (arr *Jzon, rem []byte, err error) {
 				err = expectOneOf("{[\"-1234567890ftn", rem[0])
 				return
 			}
+			extraComma = true
 			pos.col++
 			rem = rem[1:]
 			continue
 		case ' ', '\t':
+			extraComma = false
 			pos.col++
 			rem = rem[1:]
 			continue
 		case '\n', '\r':
+			extraComma = false
 			pos.row++
 			rem = rem[1:]
 			continue
 		case ']':
+			if extraComma {
+				err = expectString("value", rem)
+				return 
+			}
+			pos.col++
 			rem = rem[1:]
 			return
 		default:
-			v, rem, err = parse(rem[1:])
+			extraComma = false
+			v, rem, err = parse(rem)
 			if err != nil {
 				return
 			}
@@ -316,11 +343,6 @@ func parseNul(json []byte) (nul *Jzon, rem []byte, err error) {
 }
 
 func parseKVPair(json []byte) (k string, v *Jzon, rem []byte, err error) {
-	if json[0] != '"' {
-		err = expect('"', json[0])
-		return
-	}
-
 	k, rem, err = parseKey(json)
 	if err != nil {
 		return
@@ -376,6 +398,10 @@ func parseKey(json []byte) (k string, rem []byte, err error) {
 			}
 			parsed = append(parsed, c)
 			continue
+
+		case rem[0] >= 0 && rem[0] < 32:
+			err = expectOneOf("non-control", rem[0])
+			return
 
 		default:
 			parsed = append(parsed, rem[0])
@@ -529,7 +555,7 @@ func parseNumeric(json []byte) (n int64, f float64, isInt bool, rem []byte, err 
 	isInt = true
 	rem = json
 
-	// since the leading '-' should just occurs less than once
+	// since the leading '-' should just occur less than once
 	if rem[0] == '-' {
 		if len(rem) > 1 && !('0' <= rem[1] && rem[1] <= '9') {
 			err = expectOneOf("0123456789", rem[1])
