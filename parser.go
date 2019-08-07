@@ -572,61 +572,44 @@ func parseNumeric(json []byte) (n int64, f float64, isInt bool, rem []byte, err 
 				n = 0
 			}
 			return
-
 		case rem[0] == '0' && st.match(_nStart):
 			ex = []nState{_nDot, _nExp}
 			st = _nZero
-
 		case rem[0] == '.' && st.match(_nZero, _nDigit0, _nNoneZero):
 			ex = []nState{_nDigit1}
 			st = _nDot
-
 			isInt = false
-
 		case isDigit(rem[0]) && st.match(_nDot, _nDigit1):
 			ex = []nState{_nDigit1, _nExp}
 			st = _nDigit1
-
 			nAfterDot *= 10
 			f += float64(float64(rem[0]-'0') / nAfterDot)
-
 		case isNoneZero(rem[0]) && st.match(_nStart):
 			ex = []nState{_nDot, _nDigit0, _nExp}
 			st = _nNoneZero
-
 			n = int64(rem[0] - '0')
 			f = float64(rem[0] - '0')
-
 		case isDigit(rem[0]) && st.match(_nDigit0, _nNoneZero):
 			ex = []nState{_nDigit0, _nExp, _nDot}
 			st = _nDigit0
-
 			n = n*10 + int64(rem[0]-'0')
 			f = f*10 + float64(rem[0]-'0')
-
 		case (rem[0] == 'e' || rem[0] == 'E') && st.match(_nZero, _nNoneZero, _nDigit0, _nDigit1):
 			ex = []nState{_nPlus, _nMinus, _nDigit2}
 			st = _nExp
-
 			isInt = false
 			metExpPlus = true
-
 		case rem[0] == '+' && st.match(_nExp):
 			ex = []nState{_nDigit2}
 			st = _nPlus
-
 			metExpPlus = true
-
 		case rem[0] == '-' && st.match(_nExp):
 			ex = []nState{_nDigit2}
 			st = _nMinus
-
 			metExpPlus = false
-
 		case isDigit(rem[0]) && st.match(_nExp, _nPlus, _nMinus, _nDigit2):
 			ex = []nState{_nDigit2}
 			st = _nDigit2
-
 			nAfterExp = nAfterExp*10 + int(rem[0]-'0')
 			if metExpPlus {
 				for i := 0; i < nAfterExp; i++ {
@@ -637,7 +620,6 @@ func parseNumeric(json []byte) (n int64, f float64, isInt bool, rem []byte, err 
 					f /= 10
 				}
 			}
-
 		case !isNumericChar(rem[0]) && st.match(_nZero, _nNoneZero, _nDigit0, _nDigit1, _nDigit2):
 			if isInt {
 				f = 0
@@ -645,18 +627,15 @@ func parseNumeric(json []byte) (n int64, f float64, isInt bool, rem []byte, err 
 				n = 0
 			}
 			return
-
 		default:
 			if st.match(ex...) {
 				err = expectOneOf(nExStrings[st], rem[0])
 			} else {
 				err = expectNState(st, ex)
 			}
-
 			return
 		}
 		rem = rem[1:]
 		pos.col++
-
 	}
 }

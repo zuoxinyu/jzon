@@ -265,6 +265,17 @@ func TestParseKey(t *testing.T) {
 	if len(rem) != 0 {
 		t.Errorf("expect rem = empty []byte, but rem is %v", rem)
 	}
+
+	s = []byte(`"こにちわ　世界！"`)
+	key, rem, err = parseKey(s)
+
+	if string(key) != "こにちわ　世界！" {
+		t.Errorf("expect key = こにちわ　世界！, but key is %v", string(key))
+	}
+
+	if len(rem) != 0 {
+		t.Errorf("expect rem = empty []byte, but rem is %v", rem)
+	}
 }
 
 func TestParseUnicode(t *testing.T) {

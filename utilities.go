@@ -44,7 +44,7 @@ func Compact(formatted string) (compact string, err error) {
 	return jz.Compact(), nil
 }
 
-// Format generates human-reading text
+// Format generates human-readable text
 func (jz *Jzon) Format(indent int, step int) string {
 	return jz.render(indent, step, false, false)
 }
@@ -114,6 +114,16 @@ func (jz *Jzon) Compact() string {
 		return "null"
 	}
 	return ""
+}
+
+// GoString implements the `GoString` interface
+func (jz *Jzon) GoString() string {
+	return jz.Compact();
+}
+
+// Formatter implements the `Formmater` interface
+func (jz *Jzon) Formmater(f fmt.State, c rune) {
+
 }
 
 // Print prints human-reading JSON text to writer
