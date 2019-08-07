@@ -70,7 +70,30 @@ func (jz *Jzon) Compact() string {
 
 	case JzTypeStr: // FIXME: escaped characters
 		s, _ := jz.String()
-		return "\"" + s + "\""
+		var buf []byte
+		for _, ch := range []byte(s) {
+			switch ch {
+			case '\n':
+				buf = append(buf, '\\', 'n')
+			case '\b':
+				buf = append(buf, '\\', 'b')
+			case '\f':
+				buf = append(buf, '\\', 'f')
+			case '\t':
+				buf = append(buf, '\\', 't')
+			case '\r':
+				buf = append(buf, '\\', 'r')
+			case '\\':
+				buf = append(buf, '\\', '\\')
+			case '"':
+				buf = append(buf, '\\', '"')
+			case '/':
+				buf = append(buf, '\\', '/')
+			default: 
+				buf = append(buf, byte(ch))
+			}
+		}
+		return "\"" + string(buf) + "\""
 
 	case JzTypeInt:
 		n, _ := jz.Integer()
