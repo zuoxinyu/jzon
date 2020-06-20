@@ -293,14 +293,35 @@ func NewFromAny(v Any) *Jzon {
 		return jz
 	}
 
-	switch v.(type) {
-	case int, int16, int32, int64, uint, uint16, uint32:
+	switch realv := v.(type) {
+	case int:
 		jz.Type = JzTypeInt
-		jz.data = v
+		jz.data = int64(realv)
+	case int16:
+		jz.Type = JzTypeInt
+		jz.data = int64(realv)
+	case int32:
+		jz.Type = JzTypeInt
+		jz.data = int64(realv)
+	case int64:
+		jz.Type = JzTypeInt
+		jz.data = int64(realv)
+	case uint:
+		jz.Type = JzTypeInt
+		jz.data = int64(realv)
+	case uint16:
+		jz.Type = JzTypeInt
+		jz.data = int64(realv)
+	case uint32:
+		jz.Type = JzTypeInt
+		jz.data = int64(realv)
 
-	case float32, float64:
+	case float64:
 		jz.Type = JzTypeFlt
 		jz.data = v
+	case float32:
+		jz.Type = JzTypeFlt
+		jz.data = float64(realv)
 
 	case string:
 		jz.Type = JzTypeStr
